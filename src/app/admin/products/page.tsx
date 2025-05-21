@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from '@/lib/utils'; // Added missing import
 
 // Placeholder data - in a real app, this would come from your backend/database
 const placeholderProducts = [
