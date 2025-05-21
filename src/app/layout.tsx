@@ -15,6 +15,10 @@ const inter = Inter({
   subsets: ['latin'],
 });
 
+// Metadata was removed previously because this became a client component.
+// If you need to set global metadata, it's typically done in a higher-level Server Component
+// or you manage document.title dynamically for client-rendered sections.
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -22,6 +26,8 @@ export default function RootLayout({
 }>) {
   const pathname = usePathname();
   const isAdminPage = pathname.startsWith('/admin');
+  const isAccountPage = pathname.startsWith('/account');
+  const showMainHeaderFooter = !isAdminPage && !isAccountPage;
 
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
@@ -29,11 +35,11 @@ export default function RootLayout({
         <AuthSessionProvider> {/* Wrap with AuthSessionProvider */}
           <CartProvider>
             <div className="flex flex-col min-h-screen">
-              {!isAdminPage && <Header />}
-              <main className={`flex-grow ${!isAdminPage ? 'container mx-auto px-4 py-8' : ''}`}>
+              {showMainHeaderFooter && <Header />}
+              <main className={`flex-grow ${showMainHeaderFooter ? 'container mx-auto px-4 py-8' : ''}`}>
                 {children}
               </main>
-              {!isAdminPage && <Footer />}
+              {showMainHeaderFooter && <Footer />}
             </div>
             <Toaster />
           </CartProvider>
