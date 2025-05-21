@@ -45,13 +45,15 @@ export default function AdminProductsPage() {
           let errorResponseText = await response.text();
           let serverErrorMsg = `Server responded with ${response.status}: ${response.statusText || ''}`;
           try {
+            // Try to parse as JSON, but if it fails, it means the server sent something else (e.g., HTML)
             const errorJson = JSON.parse(errorResponseText);
             serverErrorMsg = errorJson.error || errorJson.details || serverErrorMsg;
           } catch (parseError) {
-            if (errorResponseText && errorResponseText.length > 0 && errorResponseText.length < 500 && !errorResponseText.toLowerCase().startsWith('<!doctype html>')) {
-                serverErrorMsg += ` (Content: ${errorResponseText.substring(0,150)}...)`;
+            // If JSON parsing fails, check if it's HTML (likely a server config error)
+            if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
+              serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This often indicates a server-side configuration issue (e.g., MONGODB_URI in .env.local is missing/incorrect, or an unhandled error in the API route). Please check your server console logs for more details.`;
             } else if (errorResponseText) {
-                serverErrorMsg += ` (Non-JSON or HTML content received from server)`;
+               serverErrorMsg += ` (Raw server response snippet: ${errorResponseText.substring(0,150)}...)`;
             }
             console.error("Failed to parse API error response as JSON. Status:", response.status, parseError);
             console.error("Original API error response text snippet:", errorResponseText.substring(0, 500));
@@ -67,7 +69,7 @@ export default function AdminProductsPage() {
         toast({
           variant: "destructive",
           title: "Error fetching products",
-          description: errorMessage,
+          description: errorMessage, // This will now include the more detailed hint
         });
       } finally {
         setLoading(false);
@@ -232,3 +234,4 @@ export default function AdminProductsPage() {
     </div>
   );
 }
+
