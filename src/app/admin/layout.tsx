@@ -15,7 +15,7 @@ import {
   ChevronDown,
   List,
   Shapes,
-  Search, // Added Search import
+  Search,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -106,8 +106,10 @@ export default function AdminLayout({
                         key={subItem.label}
                         variant="ghost"
                         className={cn(
-                          "w-full justify-start text-left hover:bg-muted/80 rounded-md px-3 py-2 text-sm font-medium",
-                          isActive(subItem.href) ? "bg-primary/10 text-primary font-semibold" : "text-foreground/80"
+                          "w-full justify-start text-left rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80",
+                          isActive(subItem.href)
+                            ? "bg-primary/10 text-primary font-semibold hover:text-primary"
+                            : "text-foreground/80 hover:text-foreground"
                         )}
                         asChild
                       >
@@ -126,8 +128,10 @@ export default function AdminLayout({
                 key={item.label}
                 variant="ghost"
                 className={cn(
-                  "w-full justify-start text-left hover:bg-muted/80 rounded-md px-3 py-2 text-sm font-medium",
-                  isActive(item.href) ? "bg-primary/10 text-primary font-semibold" : "text-foreground/80"
+                  "w-full justify-start text-left rounded-md px-3 py-2 text-sm font-medium hover:bg-muted/80",
+                  isActive(item.href)
+                    ? "bg-primary/10 text-primary font-semibold hover:text-primary"
+                    : "text-foreground/80 hover:text-foreground"
                 )}
                 asChild
               >
