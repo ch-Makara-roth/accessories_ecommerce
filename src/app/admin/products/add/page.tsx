@@ -89,11 +89,14 @@ export default function AddProductPage() {
       router.push('/admin/products'); // Redirect to product list
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      // Determine toast duration based on error message content
+      const isHtmlError = errorMessage.includes("Server returned an HTML error page");
+      
       toast({
         variant: 'destructive',
         title: 'Error Adding Product',
         description: errorMessage,
-        duration: 9000, // Give more time to read potentially long error messages
+        duration: isHtmlError ? 9000 : 5000, // Longer duration for critical config error
       });
       console.error("Error adding product (handleSubmit):", error);
     } finally {
