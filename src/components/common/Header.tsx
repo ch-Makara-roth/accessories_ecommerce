@@ -4,27 +4,18 @@ import Link from 'next/link';
 import Logo from './Logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, User, ShoppingCart, ChevronDown, Menu as MenuIcon, X } from 'lucide-react';
+import { Search, User, ShoppingCart, ChevronDown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetClose,
-  SheetTrigger,
-  SheetHeader,
-  SheetTitle, // Added SheetTitle
-} from "@/components/ui/sheet";
 import { popularCategories } from '@/data/categories';
 import { useCart } from '@/context/CartContext';
 import { useState, type KeyboardEvent, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Separator } from '@/components/ui/separator';
 
 const Header = () => {
   const { getCartItemCount } = useCart();
@@ -33,7 +24,6 @@ const Header = () => {
   const router = useRouter();
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -45,19 +35,10 @@ const Header = () => {
     };
   }, []);
 
-  useEffect(() => {
-    // Close mobile menu on route change
-    if (isMobileMenuOpen) {
-      setIsMobileMenuOpen(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
-
   const handleSearch = () => {
     if (searchQuery.trim()) {
       router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
       setSearchQuery('');
-      setIsMobileMenuOpen(false); // Close mobile menu on search
     }
   };
 
@@ -83,10 +64,6 @@ const Header = () => {
         "hover:text-accent hover:bg-transparent data-[state=open]:bg-accent data-[state=open]:text-accent-foreground"
     );
 
-    const commonLinkProps = {
-      onClick: () => setIsMobileMenuOpen(false), // Close mobile menu on link click
-    };
-
     return (
       <>
         <DropdownMenu>
@@ -101,17 +78,17 @@ const Header = () => {
           <DropdownMenuContent>
             {popularCategories.map((category) => (
               <DropdownMenuItem key={category.id} asChild>
-                <Link href={`/category/${category.slug}`} {...commonLinkProps}>{category.name}</Link>
+                <Link href={`/category/${category.slug}`}>{category.name}</Link>
               </DropdownMenuItem>
             ))}
             <DropdownMenuItem asChild>
-              <Link href="/category/all" {...commonLinkProps}>All Categories</Link>
+              <Link href="/category/all">All Categories</Link>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <Link href="/deals" className={getLinkClass('/deals')} {...commonLinkProps}>Deals</Link>
-        <Link href="/whats-new" className={getLinkClass('/whats-new')} {...commonLinkProps}>What&apos;s New</Link>
-        <Link href="/delivery" className={getLinkClass('/delivery')} {...commonLinkProps}>Delivery</Link>
+        <Link href="/deals" className={getLinkClass('/deals')}>Deals</Link>
+        <Link href="/whats-new" className={getLinkClass('/whats-new')}>What&apos;s New</Link>
+        <Link href="/delivery" className={getLinkClass('/delivery')}>Delivery</Link>
       </>
     );
   };
@@ -138,8 +115,8 @@ const Header = () => {
               placeholder="Search products..."
               className={cn(
                 "h-9 pr-10 pl-3 sm:pl-4 w-full text-xs sm:text-sm rounded-md border-primary/30 focus:placeholder:text-muted-foreground",
-                "text-foreground placeholder:text-muted-foreground", // Ensure text is visible
-                isScrolled ? "bg-background focus:bg-background" : "bg-card focus:bg-card" // Adjust background based on scroll
+                "text-foreground placeholder:text-muted-foreground",
+                isScrolled ? "bg-background focus:bg-background" : "bg-card focus:bg-card"
               )}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -178,41 +155,11 @@ const Header = () => {
                 )}
               </Button>
             </Link>
-            {/* Mobile Menu Trigger - visible only on <lg screens */}
-            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 text-header-foreground hover:bg-accent/20 hover:text-accent lg:hidden">
-                  <MenuIcon className="h-5 w-5" />
-                  <span className="sr-only">Open menu</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-3/4 sm:w-1/2 p-0 lg:hidden">
-                <SheetHeader className="p-4 border-b flex items-center justify-between">
-                   <SheetTitle className="text-lg font-semibold text-foreground">Menu</SheetTitle> {/* Added SheetTitle */}
-                   <Logo /> {/* Moved Logo here for better alignment if title is present or visually hidden */}
-                  <SheetClose asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <X className="h-5 w-5" />
-                      <span className="sr-only">Close</span>
-                    </Button>
-                  </SheetClose>
-                </SheetHeader>
-                <div className="p-4 space-y-2"> {/* Adjusted padding and spacing */}
-                  <NavLinks />
-                  <Separator className="my-3" />
-                   <Link href="/auth" passHref>
-                        <Button variant="ghost" className="w-full justify-start text-base font-medium text-header-foreground hover:text-accent" onClick={() => setIsMobileMenuOpen(false)}>
-                            <User className="mr-2 h-5 w-5" /> Sign Up / Login
-                        </Button>
-                    </Link>
-                </div>
-              </SheetContent>
-            </Sheet>
           </div>
         </div>
 
-        {/* --- BOTTOM ROW (NAVIGATION) - Desktop/Tablet (visible on lg+) --- */}
-        <nav className="hidden lg:flex flex-wrap items-center justify-center gap-x-1 sm:gap-x-2 lg:gap-x-4 py-2 border-t border-primary/20">
+        {/* --- BOTTOM ROW (NAVIGATION) - Visible on all screens, wraps on smaller screens --- */}
+        <nav className="flex flex-wrap items-center justify-center gap-x-1 sm:gap-x-2 lg:gap-x-4 py-2 border-t border-primary/20">
           <NavLinks />
         </nav>
       </div>
@@ -221,4 +168,3 @@ const Header = () => {
 };
 
 export default Header;
-
