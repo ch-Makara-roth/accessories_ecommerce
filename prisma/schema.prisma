@@ -1,27 +1,11 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-generator client {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  accounts      Account[]
-  sessions      Session[]
-  // Add any other user-specific fields here, e.g. role
-  // role          Role      @default(USER) 
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["mongodb"]
 }
 
 model Account {
@@ -38,13 +22,9 @@ model Account {
   id_token          String? @db.String
   session_state     String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
-  @@index([userId])
 }
 
 model Session {
@@ -53,22 +33,37 @@ model Session {
   userId       String   @db.ObjectId
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  @@index([userId])
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // For email/password authentication
+  accounts      Account[]
+  sessions      Session[]
+  otps          Otp[]     // Relation to OTP model
 }
 
 model VerificationToken {
-  identifier String   @id @map("_id") // Changed to @id and @map("_id") for MongoDB
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
   token      String   @unique
   expires    DateTime
 
   @@unique([identifier, token])
 }
 
-// Example enum for roles, if you implement role-based access
-// enum Role {
-//   USER
-//   ADMIN
-// }
+// New model for storing OTPs
+model Otp {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String
+  otp       String   // Store the hashed OTP
+  expiresAt DateTime
+  userId    String?  @db.ObjectId // Optional: link to user if OTP is for existing user
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, expiresAt])
+}
