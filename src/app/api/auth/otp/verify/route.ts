@@ -1,4 +1,3 @@
-
 // src/app/api/auth/otp/verify/route.ts
 import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
@@ -20,7 +19,7 @@ export async function POST(req: NextRequest) {
         },
       },
       orderBy: {
-        expiresAt: 'desc', // Get the latest valid OTP if multiple somehow exist
+        createdAt: 'desc', // Get the latest valid OTP if multiple somehow exist
       }
     });
 
@@ -31,44 +30,39 @@ export async function POST(req: NextRequest) {
     const isOtpValid = await bcrypt.compare(otp, storedOtpRecord.otp);
 
     if (!isOtpValid) {
+      // Optionally, you might want to invalidate the OTP after a few failed attempts.
+      // For simplicity, just returning error for now.
       return NextResponse.json({ error: 'Invalid or expired OTP.' }, { status: 400 });
     }
 
-    // OTP is valid, clean it up
+    // OTP is valid, clean it up from Otp table
     await prisma.otp.delete({
       where: { id: storedOtpRecord.id },
     });
 
-    // Find or create user and mark email as verified
-    let user = await prisma.user.findUnique({
+    // Find user and mark email as verified
+    const user = await prisma.user.findUnique({
       where: { email },
     });
 
     if (!user) {
-      // If user doesn't exist, create one.
-      // For OTP registration, you might not have a password yet.
-      // This flow assumes OTP is for email verification, possibly leading to password setup.
-      user = await prisma.user.create({
-        data: {
-          email,
-          emailVerified: new Date(), // Mark email as verified
-          name: email.split('@')[0], // Default name from email prefix
-        },
-      });
-    } else if (!user.emailVerified) {
-      // If user exists but email not verified, update it
-      user = await prisma.user.update({
-        where: { email },
-        data: { emailVerified: new Date() },
-      });
+      // This case should ideally not happen if OTP was sent for an existing user from registration
+      // or for a user trying to verify after login attempt failed due to unverified email.
+      return NextResponse.json({ error: 'User not found. Cannot verify email.' }, { status: 404 });
     }
     
-    const { password: _, ...userWithoutPassword } = user;
+    if (user.emailVerified) {
+        return NextResponse.json({ message: 'Email already verified.' }, { status: 200 });
+    }
 
+    const updatedUser = await prisma.user.update({
+      where: { email },
+      data: { emailVerified: new Date() },
+    });
+    
+    const { password: _, ...userWithoutPassword } = updatedUser;
 
-    // In a real app, you might sign them in here or redirect to set a password
-    // For now, just confirm verification
-    return NextResponse.json({ message: 'OTP verified successfully. Email is now verified.', user: userWithoutPassword }, { status: 200 });
+    return NextResponse.json({ message: 'OTP verified successfully. Your email is now verified. Please login.', user: userWithoutPassword }, { status: 200 });
 
   } catch (error) {
     console.error('OTP Verification Error:', error);

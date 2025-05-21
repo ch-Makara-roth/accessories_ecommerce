@@ -1,4 +1,3 @@
-
 // src/app/api/auth/otp/request/route.ts
 import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
@@ -25,17 +24,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
     }
 
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User with this email not found. Please register first.' }, { status: 404 });
+    }
+
+    if (user.emailVerified) {
+      return NextResponse.json({ message: 'Email is already verified.' }, { status: 200 });
+    }
+
     const otpCode = generateOtp();
     const hashedOtp = await bcrypt.hash(otpCode, 10);
     const expiresAt = addMinutes(new Date(), 10); // OTP expires in 10 minutes
 
-    // In a real app, you would send the otpCode to the user's email here
-    // For now, we log it to the console for testing
-    console.log(`OTP for ${email}: ${otpCode}`);
+    // Log OTP for testing (replace with actual email sending in production)
+    console.log(`RESEND OTP for ${email}: ${otpCode}`);
 
-    // Upsert OTP: create new or update if one exists for the email
-    // (Consider if you want to invalidate previous OTPs for the same email)
-    await prisma.otp.deleteMany({ where: { email }}); // Invalidate old OTPs
+    // Upsert OTP: delete old ones and create new
+    await prisma.otp.deleteMany({ where: { email }}); 
     await prisma.otp.create({
       data: {
         email,
@@ -44,7 +53,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ message: 'OTP generated and logged (not sent). Check server console.' }, { status: 200 });
+    return NextResponse.json({ message: 'New OTP generated and logged (not sent). Check server console.' }, { status: 200 });
 
   } catch (error) {
     console.error('OTP Request Error:', error);

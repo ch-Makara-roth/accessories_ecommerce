@@ -1,13 +1,28 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["mongodb"]
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime? // When the email was verified
+  password      String?   // For email/password auth
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  // role       Role      @default(USER) // Example for role management
 }
 
+// For NextAuth's Prisma Adapter
 model Account {
   id                String  @id @default(auto()) @map("_id") @db.ObjectId
   userId            String  @db.ObjectId
@@ -35,35 +50,27 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model User {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?   // For email/password authentication
-  accounts      Account[]
-  sessions      Session[]
-  otps          Otp[]     // Relation to OTP model
-}
-
 model VerificationToken {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  identifier String
+  identifier String   @id @map("_id")
   token      String   @unique
   expires    DateTime
 
   @@unique([identifier, token])
 }
 
-// New model for storing OTPs
+// For OTP
 model Otp {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   email     String
-  otp       String   // Store the hashed OTP
+  otp       String   // Store hashed OTP
   expiresAt DateTime
-  userId    String?  @db.ObjectId // Optional: link to user if OTP is for existing user
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([email, expiresAt])
+  @@unique([email, otp]) // Should be unique for an email at a given time, but Prisma needs a way to handle this.
+                        // Consider indexing email for faster lookups.
+  @@index([email])
 }
+
+// enum Role {
+//   USER
+//   ADMIN
+// }

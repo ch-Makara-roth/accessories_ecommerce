@@ -1,8 +1,17 @@
-
 // src/app/api/auth/register/route.ts
 import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { addMinutes } from 'date-fns';
+
+function generateOtp(length: number = 6): string {
+  const digits = '0123456789';
+  let otp = '';
+  for (let i = 0; i < length; i++) {
+    otp += digits[Math.floor(Math.random() * 10)];
+  }
+  return otp;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,12 +21,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Validate email format (basic)
     if (!/\S+@\S+\.\S+/.test(email)) {
         return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
     }
 
-    // Validate password strength (example: min 8 characters)
     if (password.length < 8) {
         return NextResponse.json({ error: 'Password must be at least 8 characters long' }, { status: 400 });
     }
@@ -27,7 +34,15 @@ export async function POST(req: NextRequest) {
     });
 
     if (existingUser) {
-      return NextResponse.json({ error: 'User with this email already exists' }, { status: 409 }); // 409 Conflict
+      // If user exists and email is verified, they should login.
+      // If user exists but email not verified, allow re-registration to trigger new OTP.
+      if (existingUser.emailVerified) {
+        return NextResponse.json({ error: 'User with this email already exists and is verified. Please login.' }, { status: 409 });
+      }
+      // If user exists but not verified, we'll overwrite them or update them, then send new OTP.
+      // For simplicity, let's delete existing unverified user to avoid complexity with accounts/sessions.
+      // A more robust solution might update them or handle merging if they try OAuth later.
+      await prisma.user.delete({ where: { email }});
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -38,14 +53,33 @@ export async function POST(req: NextRequest) {
         email,
         password: hashedPassword,
         name,
-        // emailVerified: null, // Email not verified yet by default
+        emailVerified: null, // Email not verified yet
       },
     });
 
-    // Omit password from the returned user object
-    const { password: _, ...userWithoutPassword } = newUser;
+    // Generate and store OTP
+    const otpCode = generateOtp();
+    const hashedOtp = await bcrypt.hash(otpCode, 10);
+    const expiresAt = addMinutes(new Date(), 10); // OTP expires in 10 minutes
 
-    return NextResponse.json({ message: 'User registered successfully', user: userWithoutPassword }, { status: 201 });
+    // Invalidate any old OTPs for this email
+    await prisma.otp.deleteMany({ where: { email } });
+    await prisma.otp.create({
+      data: {
+        email,
+        otp: hashedOtp,
+        expiresAt,
+      },
+    });
+
+    // Log OTP for testing (replace with actual email sending in production)
+    console.log(`REGISTRATION OTP for ${email}: ${otpCode} (User ID: ${newUser.id})`);
+
+    return NextResponse.json({ 
+      message: 'Registration successful. Please check your console for an OTP to verify your email.', // Adjusted message
+      emailForOtp: email 
+    }, { status: 201 });
+
   } catch (error) {
     console.error('Registration Error:', error);
     let errorMessage = 'An unexpected error occurred';

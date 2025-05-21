@@ -15,7 +15,7 @@ if (!process.env.GOOGLE_CLIENT_SECRET) {
 if (!process.env.NEXTAUTH_SECRET) {
   throw new Error('Missing NEXTAUTH_SECRET environment variable');
 }
-if (!process.env.DATABASE_URL) { // Prisma uses DATABASE_URL
+if (!process.env.DATABASE_URL) { 
   throw new Error('Missing DATABASE_URL environment variable for Prisma');
 }
 
@@ -25,6 +25,8 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      // Prisma adapter automatically handles account linking for OAuth providers.
+      // It also sets emailVerified if the provider confirms it.
     }),
     CredentialsProvider({
       name: 'Credentials',
@@ -42,30 +44,34 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user || !user.password) {
-          // User not found or user signed up with OAuth and doesn't have a password
-          throw new Error('Invalid email or password');
+          throw new Error('Invalid email or password.');
         }
 
         const isValidPassword = await bcrypt.compare(credentials.password, user.password);
 
         if (!isValidPassword) {
-          throw new Error('Invalid email or password');
+          throw new Error('Invalid email or password.');
+        }
+
+        if (!user.emailVerified) {
+          // Custom error code or message that the client can specifically check for
+          throw new Error('Email not verified. Please check your inbox for a verification code or request a new one.');
         }
         
-        // Return user object that NextAuth expects
         return {
           id: user.id,
           name: user.name,
           email: user.email,
           image: user.image,
-        } as NextAuthUser; // Cast to NextAuthUser
+          // emailVerified: user.emailVerified // Can be passed if needed by client session
+        } as NextAuthUser; 
       }
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
     signIn: '/auth', 
-    // error: '/auth/error', // (Optional) A page to handle authentication errors
+    error: '/auth', // Redirect to /auth on error, error type will be in query params
   },
   session: {
     strategy: 'jwt', 
@@ -74,17 +80,19 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (token.sub && session.user) {
         session.user.id = token.sub;
-        // You can add other token properties to session here if needed
-        // e.g., session.user.role = token.role; 
+        // Add emailVerified to session if needed by client
+        // if (token.emailVerified) {
+        //   (session.user as any).emailVerified = token.emailVerified;
+        // }
       }
       return session;
     },
-    async jwt({ token, user, account, profile }) {
-      if (user) { // This user object comes from the provider (Google or Credentials)
+    async jwt({ token, user, account }) {
+      if (user) { 
         token.sub = user.id;
-        // If you add role to your User model and want it in JWT
-        // const dbUser = await prisma.user.findUnique({ where: { id: user.id }});
-        // if (dbUser?.role) token.role = dbUser.role;
+        // if (user.emailVerified) { // user object from authorize or OAuth
+        //   token.emailVerified = user.emailVerified;
+        // }
       }
       if (account) {
         token.accessToken = account.access_token;
