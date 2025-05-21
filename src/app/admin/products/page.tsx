@@ -55,8 +55,9 @@ export default function AdminProductsPage() {
             } else if (errorResponseText) {
                serverErrorMsg += ` (Raw server response snippet: ${errorResponseText.substring(0,150)}...)`;
             }
+            // Client-side: Log the parse error and the raw response for debugging
             console.error("Client-side: Failed to parse API error response as JSON. This usually means the server sent HTML instead of JSON. Status:", response.status, "Parse Error:", parseError);
-            console.error("Original API error response text snippet:", errorResponseText.substring(0, 500));
+            console.error("Client-side: Original API error response text snippet:", errorResponseText.substring(0, 500));
           }
           throw new Error(serverErrorMsg);
         }
@@ -82,24 +83,102 @@ export default function AdminProductsPage() {
     console.log('See All button clicked. Implement navigation or filter clearing logic here.');
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-2 text-muted-foreground">Loading products...</p>
-      </div>
-    );
-  }
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="ml-2 text-muted-foreground">Loading products...</p>
+        </div>
+      );
+    }
 
-  if (error) {
+    if (error) {
+      return (
+        <div className="text-center py-10">
+          <p className="text-destructive font-semibold">Error loading products:</p>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()} className="mt-4">Try Again</Button>
+        </div>
+      );
+    }
+
+    if (products.length === 0) {
+      return (
+        <p className="text-center text-muted-foreground py-8">No products found. Try adding some!</p>
+      );
+    }
+
     return (
-      <div className="text-center py-10">
-        <p className="text-destructive font-semibold">Error loading products:</p>
-        <p className="text-muted-foreground">{error}</p>
-        <Button onClick={() => window.location.reload()} className="mt-4">Try Again</Button>
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[50px]">
+                <Checkbox id="selectAll" />
+            </TableHead>
+            <TableHead>Product Name</TableHead>
+            <TableHead>Category</TableHead>
+            <TableHead className="text-right">Price</TableHead>
+            <TableHead className="text-right">Stock</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {products.map((product) => (
+            <TableRow key={product.id}>
+              <TableCell>
+                <Checkbox id={`select-${product.id}`} />
+              </TableCell>
+              <TableCell className="font-medium flex items-center gap-3">
+                <Image 
+                    src={product.image || 'https://placehold.co/40x40.png'} 
+                    alt={product.name} 
+                    width={40}
+                    height={40}
+                    className="h-10 w-10 object-cover rounded"
+                    data-ai-hint={product.dataAiHint || "product thumbnail"}
+                    onError={(e) => { const target = e.target as HTMLImageElement; target.src = 'https://placehold.co/40x40.png'; }}
+                />
+                {product.name}
+              </TableCell>
+              <TableCell>{product.category}</TableCell>
+              <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
+              <TableCell className="text-right">{product.stock || 0}</TableCell>
+              <TableCell>
+                <span className={cn("px-2 py-0.5 text-xs rounded-full font-medium",
+                    product.status === 'Active' ? 'bg-green-100 text-green-700' 
+                    : product.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' 
+                    : product.status === 'Draft' ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-gray-100 text-gray-700'
+                )}>
+                    {product.status || 'N/A'}
+                </span>
+              </TableCell>
+              <TableCell className="text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreHorizontal className="h-4 w-4" />
+                      <span className="sr-only">Product Actions</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem>
+                      <Edit2 className="mr-2 h-4 w-4" /> Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive">
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     );
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -150,87 +229,19 @@ export default function AdminProductsPage() {
             </div>
         </CardHeader>
         <CardContent>
-          {products.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">No products found. Try adding some!</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[50px]">
-                      <Checkbox id="selectAll" />
-                  </TableHead>
-                  <TableHead>Product Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {products.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell>
-                      <Checkbox id={`select-${product.id}`} />
-                    </TableCell>
-                    <TableCell className="font-medium flex items-center gap-3">
-                      <Image 
-                          src={product.image || 'https://placehold.co/40x40.png'} 
-                          alt={product.name} 
-                          width={40}
-                          height={40}
-                          className="h-10 w-10 object-cover rounded"
-                          data-ai-hint={product.dataAiHint || "product thumbnail"}
-                          onError={(e) => { const target = e.target as HTMLImageElement; target.src = 'https://placehold.co/40x40.png'; }}
-                      />
-                      {product.name}
-                    </TableCell>
-                    <TableCell>{product.category}</TableCell>
-                    <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{product.stock || 0}</TableCell>
-                    <TableCell>
-                      <span className={cn("px-2 py-0.5 text-xs rounded-full font-medium",
-                          product.status === 'Active' ? 'bg-green-100 text-green-700' 
-                          : product.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' 
-                          : product.status === 'Draft' ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-gray-100 text-gray-700'
-                      )}>
-                          {product.status || 'N/A'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Product Actions</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Edit2 className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          {renderContent()}
         </CardContent>
       </Card>
        {/* Pagination placeholder */}
-        <div className="flex items-center justify-between mt-6">
-            <Button variant="outline" size="sm" disabled>Previous</Button>
-            <div className="flex items-center gap-1 text-sm">
-                <Button variant="default" size="sm" className="h-8 w-8 p-0">1</Button>
-            </div>
-            <Button variant="outline" size="sm" disabled>Next</Button>
-        </div>
+        {!loading && !error && products.length > 0 && (
+          <div className="flex items-center justify-between mt-6">
+              <Button variant="outline" size="sm" disabled>Previous</Button>
+              <div className="flex items-center gap-1 text-sm">
+                  <Button variant="default" size="sm" className="h-8 w-8 p-0">1</Button>
+              </div>
+              <Button variant="outline" size="sm" disabled>Next</Button>
+          </div>
+        )}
     </div>
   );
 }
