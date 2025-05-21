@@ -21,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable}> {/* Use new font variable */}
+    <html lang="en" className={inter.variable}>
       <body className={`antialiased font-sans bg-background text-foreground`}>
         <div className="flex flex-col min-h-screen">
           <Header />
