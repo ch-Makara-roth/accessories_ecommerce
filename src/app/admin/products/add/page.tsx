@@ -61,11 +61,26 @@ export default function AddProductPage() {
         body: JSON.stringify(productData),
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to add product');
+        let errorResult;
+        const errorResponseText = await response.text();
+        let serverErrorMsg = `Server responded with ${response.status}: ${response.statusText || ''}`;
+        try {
+          errorResult = JSON.parse(errorResponseText);
+          serverErrorMsg = errorResult.error || errorResult.details || serverErrorMsg;
+        } catch (e) {
+          // If JSON.parse fails, it means the server sent something else (e.g., HTML)
+          if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
+             serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This often indicates a server-side configuration issue (e.g., MONGODB_URI in .env.local is missing/incorrect, or an unhandled error in the API route). Please check your server console logs for more details.`;
+          } else if (errorResponseText) {
+            serverErrorMsg += ` (Raw server response snippet: ${errorResponseText.substring(0,200)}...)`;
+          }
+          console.error("Client-side: Failed to parse API POST error response as JSON. Status:", response.status, "Response text:", errorResponseText.substring(0,500));
+        }
+        throw new Error(serverErrorMsg);
       }
+
+      const result = await response.json(); // Expect JSON if response.ok
 
       toast({
         title: 'Success!',
@@ -78,8 +93,9 @@ export default function AddProductPage() {
         variant: 'destructive',
         title: 'Error adding product',
         description: errorMessage,
+        duration: 7000, // Give more time to read potentially long error messages
       });
-      console.error("Error adding product:", error);
+      console.error("Error adding product (handleSubmit):", error);
     } finally {
       setIsLoading(false);
     }
@@ -148,7 +164,7 @@ export default function AddProductPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="productImage">Product Image URL *</Label>
-                <Input id="productImage" placeholder="https://example.com/image.png" value={image} onChange={(e) => setImage(e.target.value)} required />
+                <Input id="productImage" placeholder="https://placehold.co/600x400.png" value={image} onChange={(e) => setImage(e.target.value)} required />
               </div>
             </div>
 
