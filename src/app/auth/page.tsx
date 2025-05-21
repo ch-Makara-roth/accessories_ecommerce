@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
-import { useState, type FormEvent, useEffect } from 'react'; // Added useEffect
+import { useState, type FormEvent, useEffect } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { ShieldCheck, Chrome, Facebook, Mail, KeyRound } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -193,10 +193,10 @@ export default function AuthPage() {
                     <Button type="submit" className="w-full" disabled={isLoading}>
                       {isLoading ? 'Logging in...' : 'Login'}
                     </Button>
-                    <Button variant="outline" className="w-full mt-2" onClick={() => signIn('google', { callbackUrl: '/account' })} disabled={isLoading}>
+                    <Button type="button" variant="outline" className="w-full mt-2" onClick={() => signIn('google', { callbackUrl: '/account' })} disabled={isLoading}>
                       <Chrome className="mr-2 h-4 w-4" /> Login with Google
                     </Button>
-                     <Button variant="outline" className="w-full mt-2" onClick={() => alert('Facebook login not implemented yet.')} disabled={isLoading}>
+                     <Button type="button" variant="outline" className="w-full mt-2" onClick={() => alert('Facebook login not implemented yet.')} disabled={isLoading}>
                       <Facebook className="mr-2 h-4 w-4" /> Login with Facebook
                     </Button>
                   </CardContent>
@@ -243,10 +243,10 @@ export default function AuthPage() {
                      <Button type="submit" className="w-full" disabled={isLoading}>
                       {isLoading ? 'Creating Account...' : 'Create account'}
                     </Button>
-                    <Button variant="outline" className="w-full mt-2" onClick={() => signIn('google', { callbackUrl: '/account' })} disabled={isLoading}>
+                    <Button type="button" variant="outline" className="w-full mt-2" onClick={() => signIn('google', { callbackUrl: '/account' })} disabled={isLoading}>
                       <Chrome className="mr-2 h-4 w-4" /> Sign up with Google
                     </Button>
-                    <Button variant="outline" className="w-full mt-2" onClick={() => alert('Facebook signup not implemented yet.')} disabled={isLoading}>
+                    <Button type="button" variant="outline" className="w-full mt-2" onClick={() => alert('Facebook signup not implemented yet.')} disabled={isLoading}>
                       <Facebook className="mr-2 h-4 w-4" /> Sign up with Facebook
                     </Button>
                   </CardContent>
