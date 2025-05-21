@@ -1,7 +1,7 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Home, ShoppingBag, Users, Settings } from 'lucide-react';
+import { Home, ShoppingBag, Users, Settings, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -23,9 +23,6 @@ export default function AdminLayout({
     // { href: '/admin/users', label: 'Customers', icon: Users },
     // { href: '/admin/settings', label: 'Settings', icon: Settings },
   ];
-
-  // Basic styling for active link - in a real app, usePathname would be better
-  // For simplicity, we'll just style the links generally.
 
   return (
     <div className="flex min-h-screen bg-muted/40">
@@ -58,15 +55,17 @@ export default function AdminLayout({
       </aside>
       <div className="flex-1 flex flex-col">
         <header className="sticky top-0 h-16 flex items-center justify-between bg-background border-b px-6 md:justify-end">
-            {/* Mobile Menu Trigger (optional, for a more complex mobile nav) */}
              <div className="md:hidden">
                 <Link href="/admin" className="text-xl font-bold text-primary">
                     Admin
                 </Link>
              </div>
-            {/* User/Auth section for admin can go here */}
+            {/* User/Auth section for admin */}
             <div>
-                <Button variant="outline" size="sm">Admin User</Button>
+                <Button variant="outline" size="sm">
+                    <UserCircle className="mr-2 h-4 w-4" />
+                    Admin User
+                </Button>
             </div>
         </header>
         <main className="flex-1 p-6 overflow-auto">
