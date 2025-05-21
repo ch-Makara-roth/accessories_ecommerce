@@ -1,4 +1,6 @@
 
+'use client'; // Added 'use client' for useState
+
 import { getProductById, products as allProducts } from '@/data/products';
 import type { Product } from '@/types';
 import Image from 'next/image';
@@ -8,20 +10,30 @@ import ProductGrid from '@/components/products/ProductGrid';
 import { Separator } from '@/components/ui/separator';
 import { Heart, Share2 } from 'lucide-react';
 import Link from 'next/link';
-import AddToCartButton from '@/components/products/AddToCartButton'; // Added import
+import AddToCartButton from '@/components/products/AddToCartButton';
+import { useState } from 'react'; // Added useState
 
 interface ProductDetailPageProps {
   params: { id: string };
 }
 
-export async function generateStaticParams() {
-  return allProducts.map(product => ({
-    id: product.id,
-  }));
-}
+// export async function generateStaticParams() { // Removed as we are using client component features
+//   return allProducts.map(product => ({
+//     id: product.id,
+//   }));
+// } 
+// Disabling generateStaticParams as this page now uses client-side hooks (useState)
+// For a production app, you'd fetch product data client-side or use a different pattern
+// if you need generateStaticParams with client interactivity.
 
 export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const product = getProductById(params.id);
+  const [isFavorited, setIsFavorited] = useState(false);
+
+  const toggleFavorite = () => {
+    setIsFavorited(!isFavorited);
+    // In a real app, you'd also update backend/context state here
+  };
 
   if (!product) {
     return (
@@ -82,9 +94,17 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
               product={product} 
               size="lg" 
               className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90" 
-            />
-            <Button variant="outline" size="lg" className="text-primary border-primary hover:bg-primary/10">
-              <Heart className="mr-2 h-5 w-5" /> Favorite
+            >
+              Add to Cart
+            </AddToCartButton>
+            <Button 
+              variant="outline" 
+              size="lg" 
+              className={`flex-1 ${isFavorited ? 'border-red-500 text-red-500 hover:bg-red-500/10' : 'text-primary border-primary hover:bg-primary/10'}`}
+              onClick={toggleFavorite}
+              aria-pressed={isFavorited}
+            >
+              <Heart className={`mr-2 h-5 w-5 ${isFavorited ? 'fill-red-500' : ''}`} /> {isFavorited ? 'Favorited' : 'Favorite'}
             </Button>
           </div>
 

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import StarRating from './StarRating';
 import { Heart } from 'lucide-react';
-import React from 'react';
+import React, { useState } from 'react'; // Added useState
 import AddToCartButton from './AddToCartButton';
 
 interface ProductCardProps {
@@ -15,6 +15,13 @@ interface ProductCardProps {
 }
 
 const ProductCard: React.FC<ProductCardProps> = React.memo(({ product }) => {
+  const [isFavorited, setIsFavorited] = useState(false);
+
+  const toggleFavorite = () => {
+    setIsFavorited(!isFavorited);
+    // In a real app, you'd also update backend/context state here
+  };
+
   return (
     <Card className="flex flex-col h-full overflow-hidden rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out">
       <CardHeader className="p-0 relative">
@@ -28,8 +35,16 @@ const ProductCard: React.FC<ProductCardProps> = React.memo(({ product }) => {
             data-ai-hint={product.dataAiHint || 'product image'}
           />
         </Link>
-        <Button variant="ghost" size="icon" className="absolute top-2 right-2 bg-card/50 hover:bg-card/80 rounded-full text-primary hover:text-primary/80">
-          <Heart className="h-5 w-5" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="absolute top-2 right-2 bg-card/50 hover:bg-card/80 rounded-full text-primary hover:text-primary/80"
+          onClick={toggleFavorite}
+          aria-pressed={isFavorited}
+        >
+          <Heart 
+            className={`h-5 w-5 ${isFavorited ? 'text-red-500 fill-red-500' : 'text-primary'}`} 
+          />
           <span className="sr-only">Favorite</span>
         </Button>
       </CardHeader>
@@ -52,7 +67,9 @@ const ProductCard: React.FC<ProductCardProps> = React.memo(({ product }) => {
         </p>
       </CardContent>
       <CardFooter className="p-4 pt-0">
-        <AddToCartButton product={product} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors" />
+        <AddToCartButton product={product} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+            Add to Cart
+        </AddToCartButton>
       </CardFooter>
     </Card>
   );
