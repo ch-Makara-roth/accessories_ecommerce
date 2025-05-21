@@ -7,8 +7,15 @@ export default function AdminAnalyticsPage() {
   const analyticsStats = [
     { title: 'Total Visitors', value: '12,879', icon: Users, change: '+15.2% this month' },
     { title: 'Conversion Rate', value: '3.45%', icon: Percent, change: '+0.5% vs last month' },
-    { title: 'Bounce Rate', value: '45.6%', icon: TrendingUp, change: '-2.1% (improved)' }, // TrendingUp can signify lower bounce
+    { title: 'Bounce Rate', value: '45.6%', icon: TrendingUp, change: '-2.1% (improved)' },
     { title: 'Avg. Session', value: '3m 45s', icon: Clock, change: '+12s vs last month' },
+  ];
+
+  const topPagesData = [
+    { path: '/home', views: '5,234 views' },
+    { path: '/product/wireless-earbuds', views: '3,102 views' },
+    { path: '/category/headphones', views: '2,500 views' },
+    { path: '/cart', views: '1,800 views' },
   ];
 
   return (
@@ -74,12 +81,13 @@ export default function AdminAnalyticsPage() {
             <CardDescription>Most viewed pages on your store.</CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Placeholder for top pages list */}
             <ul className="space-y-2 text-sm">
-                <li className="text-muted-foreground flex justify-between"><span>/home</span> <span>5,234 views</span></li>
-                <li className="text-muted-foreground flex justify-between"><span>/product/wireless-earbuds</span> <span>3,102 views</span></li>
-                <li className="text-muted-foreground flex justify-between"><span>/category/headphones</span> <span>2,500 views</span></li>
-                <li className="text-muted-foreground flex justify-between"><span>/cart</span> <span>1,800 views</span></li>
+              {topPagesData.map((page) => (
+                <li key={page.path} className="flex justify-between items-center text-foreground/80 hover:text-foreground transition-colors">
+                  <span className="truncate">{page.path}</span>
+                  <span className="font-medium text-muted-foreground">{page.views}</span>
+                </li>
+              ))}
             </ul>
           </CardContent>
         </Card>
