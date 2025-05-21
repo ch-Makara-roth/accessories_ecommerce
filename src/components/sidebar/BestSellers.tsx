@@ -38,7 +38,7 @@ const BestSellers = () => {
                 <StarRating rating={product.rating} size={14} className="my-1" />
                 <p className="text-sm text-primary font-bold">${product.price.toFixed(2)}</p>
                 <Button variant="outline" size="sm" className="mt-2 text-xs">
-                  <ShoppingCart className="mr-1 h-3 w-3" /> Add to cart
+                  <ShoppingCart className="mr-1 h-3 w-3" /> Add to Cart
                 </Button>
               </div>
             </li>
