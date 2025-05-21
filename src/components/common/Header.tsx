@@ -13,14 +13,26 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { popularCategories } from '@/data/categories';
 import { useCart } from '@/context/CartContext';
-import { useState, type KeyboardEvent } from 'react';
+import { useState, type KeyboardEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 const Header = () => {
   const { getCartItemCount } = useCart();
   const cartItemCount = getCartItemCount();
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -35,7 +47,12 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-header-background text-header-foreground sticky top-0 z-50 shadow-md">
+    <header 
+      className={cn(
+        "text-header-foreground sticky top-0 z-50 transition-all duration-300 ease-in-out",
+        isScrolled ? "bg-card shadow-lg" : "bg-header-background shadow-md"
+      )}
+    >
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <Logo />
         <nav className="hidden md:flex items-center space-x-6">
@@ -65,7 +82,10 @@ const Header = () => {
             <Input
               type="search"
               placeholder="Search products..."
-              className="h-9 pr-10 pl-3 text-sm bg-card text-header-foreground placeholder:text-header-foreground/70 border-primary/30 focus:bg-card focus:text-primary-foreground focus:placeholder:text-primary-foreground/70 w-32 md:w-48"
+              className={cn(
+                "h-9 pr-10 pl-3 text-sm text-header-foreground placeholder:text-header-foreground/70 border-primary/30 focus:placeholder:text-primary-foreground/70",
+                isScrolled ? "bg-background focus:bg-background text-primary-foreground" : "bg-card focus:bg-card text-primary-foreground"
+              )}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={handleKeyPress}
