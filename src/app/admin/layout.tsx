@@ -15,6 +15,7 @@ import {
   ChevronDown,
   List,
   Shapes,
+  Search, // Added Search import
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
