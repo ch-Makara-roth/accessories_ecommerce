@@ -25,7 +25,7 @@ const PromotionalBanner = () => {
           <span className="block text-primary">50% Off</span>
           <span className="block text-banner-text-primary">on Selected Headphones</span>
         </h2>
-        <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-10 py-6 text-lg font-semibold shadow-md transition-transform hover:scale-105">
+        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-6 py-3 text-base md:px-10 md:py-4 md:text-lg font-semibold shadow-md transition-transform hover:scale-105">
           Buy Now
         </Button>
       </div>

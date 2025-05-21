@@ -40,7 +40,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           {product.reviewCount && <span className="ml-2 text-xs text-muted-foreground">({product.reviewCount})</span>}
         </div>
         <p className="text-sm text-muted-foreground mb-3 h-10 overflow-hidden">{product.description}</p>
-        <p className="text-xl font-semibold text-primary mb-1">
+        <p className="text-lg sm:text-xl font-semibold text-primary mb-1">
           ${product.price.toFixed(2)}+
           {product.originalPrice && (
             <span className="ml-2 text-sm line-through text-muted-foreground">${product.originalPrice.toFixed(2)}</span>
