@@ -1,15 +1,46 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { Product } from '@/types';
 import { getPersonalizedProductRecommendations, type PersonalizedProductRecommendationsOutput } from '@/ai/flows/personalized-product-recommendations';
-import { products as allProducts, getProductById } from '@/data/products'; // Assuming you have a way to get all products or by ID
+import { products as allProducts, getProductById } from '@/data/products'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '../ui/button';
 import { ShoppingCart } from 'lucide-react';
+
+interface RecommendedProductItemProps {
+  product: Product;
+}
+
+const RecommendedProductItem: React.FC<RecommendedProductItemProps> = React.memo(({ product }) => {
+  return (
+    <div className="flex items-start space-x-3 p-3 bg-muted/30 hover:bg-muted/60 rounded-lg transition-colors">
+      <Link href={`/product/${product.id}`} className="shrink-0">
+        <Image 
+          src={product.image} 
+          alt={product.name} 
+          width={80} 
+          height={80} 
+          className="rounded-md object-cover aspect-square"
+          data-ai-hint={product.dataAiHint || 'product image'}
+        />
+      </Link>
+      <div className="flex-1">
+        <Link href={`/product/${product.id}`}>
+          <h4 className="text-sm font-semibold text-foreground hover:text-primary transition-colors">{product.name}</h4>
+        </Link>
+        <p className="text-sm text-primary font-bold">${product.price.toFixed(2)}</p>
+          <Button variant="outline" size="sm" className="mt-2 text-xs">
+            <ShoppingCart className="mr-1 h-3 w-3" /> Add to Cart
+          </Button>
+      </div>
+    </div>
+  );
+});
+RecommendedProductItem.displayName = 'RecommendedProductItem';
 
 const AiProductRecommendations = () => {
   const [recommendations, setRecommendations] = useState<Product[]>([]);
@@ -91,7 +122,6 @@ const AiProductRecommendations = () => {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">No specific recommendations for you at the moment. Check out our popular items!</p>
-          {/* Optionally show some default popular items here */}
         </CardContent>
       </Card>
     );
@@ -106,27 +136,7 @@ const AiProductRecommendations = () => {
       <CardContent>
         <div className="space-y-4">
           {recommendations.map(product => (
-            <div key={product.id} className="flex items-start space-x-3 p-3 bg-muted/30 hover:bg-muted/60 rounded-lg transition-colors">
-              <Link href={`/product/${product.id}`} className="shrink-0">
-                <Image 
-                  src={product.image} 
-                  alt={product.name} 
-                  width={80} 
-                  height={80} 
-                  className="rounded-md object-cover aspect-square"
-                  data-ai-hint={product.dataAiHint || 'product image'}
-                />
-              </Link>
-              <div className="flex-1">
-                <Link href={`/product/${product.id}`}>
-                  <h4 className="text-sm font-semibold text-foreground hover:text-primary transition-colors">{product.name}</h4>
-                </Link>
-                <p className="text-sm text-primary font-bold">${product.price.toFixed(2)}</p>
-                 <Button variant="outline" size="sm" className="mt-2 text-xs">
-                   <ShoppingCart className="mr-1 h-3 w-3" /> Add to Cart
-                 </Button>
-              </div>
-            </div>
+            <RecommendedProductItem key={product.id} product={product} />
           ))}
         </div>
       </CardContent>

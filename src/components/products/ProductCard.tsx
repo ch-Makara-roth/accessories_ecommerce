@@ -6,16 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import StarRating from './StarRating';
 import { Heart, ShoppingCart } from 'lucide-react';
+import React from 'react';
 
 interface ProductCardProps {
   product: Product;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
+const ProductCard: React.FC<ProductCardProps> = React.memo(({ product }) => {
   return (
     <Card className="flex flex-col h-full overflow-hidden rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out">
       <CardHeader className="p-0 relative">
-        <Link href={`/product/${product.id}`} className="block aspect-[4/3] overflow-hidden">
+        <Link href={`/product/${product.id}`} className="block aspect-[4/3] overflow-hidden group">
           <Image
             src={product.image}
             alt={product.name}
@@ -55,6 +56,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       </CardFooter>
     </Card>
   );
-};
+});
+
+ProductCard.displayName = 'ProductCard';
 
 export default ProductCard;
