@@ -43,16 +43,22 @@ export default function AdminProductsPage() {
         const response = await fetch('/api/products');
         if (!response.ok) {
           let errorResponseText = await response.text();
-          let serverErrorMsg = `Server responded with ${response.status}: ${response.statusText}`;
+          let serverErrorMsg = `Server responded with ${response.status}: ${response.statusText || ''}`;
           try {
             const errorJson = JSON.parse(errorResponseText);
             serverErrorMsg = errorJson.error || errorJson.details || serverErrorMsg;
-          } catch (e) {
-            console.error("Non-JSON error from server (admin/products):", errorResponseText.substring(0, 500));
+          } catch (parseError) {
+            if (errorResponseText && errorResponseText.length > 0 && errorResponseText.length < 500 && !errorResponseText.toLowerCase().startsWith('<!doctype html>')) {
+                serverErrorMsg += ` (Content: ${errorResponseText.substring(0,150)}...)`;
+            } else if (errorResponseText) {
+                serverErrorMsg += ` (Non-JSON or HTML content received from server)`;
+            }
+            console.error("Failed to parse API error response as JSON. Status:", response.status, parseError);
+            console.error("Original API error response text snippet:", errorResponseText.substring(0, 500));
           }
           throw new Error(serverErrorMsg);
         }
-        const data = await response.json(); // If response.ok, we expect JSON
+        const data = await response.json(); 
         setProducts(data.products || []);
       } catch (err) {
         console.error(err);
@@ -72,8 +78,6 @@ export default function AdminProductsPage() {
 
   const handleSeeAllClick = () => {
     console.log('See All button clicked. Implement navigation or filter clearing logic here.');
-    // For now, we can just re-fetch or clear local filters if any were applied client-side
-    // Example: refetchProducts(); 
   };
 
   if (loading) {
@@ -175,7 +179,7 @@ export default function AdminProductsPage() {
                           height={40}
                           className="h-10 w-10 object-cover rounded"
                           data-ai-hint={product.dataAiHint || "product thumbnail"}
-                          onError={(e) => { const target = e.target as HTMLImageElement; target.src = 'https://placehold.co/40x40.png'; }} // Fallback image
+                          onError={(e) => { const target = e.target as HTMLImageElement; target.src = 'https://placehold.co/40x40.png'; }}
                       />
                       {product.name}
                     </TableCell>
@@ -219,12 +223,11 @@ export default function AdminProductsPage() {
       </Card>
        {/* Pagination placeholder */}
         <div className="flex items-center justify-between mt-6">
-            <Button variant="outline" size="sm" disabled>Previous</Button> {/* Add disabled state based on pagination logic */}
+            <Button variant="outline" size="sm" disabled>Previous</Button>
             <div className="flex items-center gap-1 text-sm">
                 <Button variant="default" size="sm" className="h-8 w-8 p-0">1</Button>
-                {/* Add more page numbers dynamically */}
             </div>
-            <Button variant="outline" size="sm" disabled>Next</Button> {/* Add disabled state based on pagination logic */}
+            <Button variant="outline" size="sm" disabled>Next</Button>
         </div>
     </div>
   );
