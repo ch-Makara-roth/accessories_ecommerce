@@ -8,13 +8,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from "@/components/ui/checkbox";
 import { PlusCircle, Search, Edit2, Trash2, MoreHorizontal, Filter as FilterIcon } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link'; // Added Link import
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from '@/lib/utils'; // Added missing import
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog"; // Added Dialog imports
+import { cn } from '@/lib/utils';
 
 // Placeholder data - in a real app, this would come from your backend/database
 const placeholderProducts = [
@@ -28,6 +39,12 @@ const placeholderProducts = [
 ];
 
 export default function AdminProductsPage() {
+
+  const handleSeeAllClick = () => {
+    console.log('See All button clicked. Implement navigation or filter clearing logic here.');
+    // For now, it does nothing visually. In a real app, it might navigate or clear filters.
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -38,12 +55,41 @@ export default function AdminProductsPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <CardTitle className="text-xl font-semibold">Products list</CardTitle>
             <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm">
-                    <FilterIcon className="mr-2 h-4 w-4" /> Filter
-                </Button>
-                <Button variant="outline" size="sm">See All</Button>
-                <Button className="bg-primary text-primary-foreground hover:bg-primary/90" size="sm">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add New
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                        <FilterIcon className="mr-2 h-4 w-4" /> Filter
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Filter Products</DialogTitle>
+                      <DialogDescription>
+                        Select your filter criteria below. (Filtering functionality not yet implemented.)
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <p className="text-sm text-muted-foreground">
+                        Placeholder for filter options (e.g., by category, price range, status).
+                      </p>
+                    </div>
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button type="button" variant="secondary">
+                          Cancel
+                        </Button>
+                      </DialogClose>
+                      <Button type="button">Apply Filters</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <Button variant="outline" size="sm" onClick={handleSeeAllClick}>See All</Button>
+                
+                <Button className="bg-primary text-primary-foreground hover:bg-primary/90" size="sm" asChild>
+                  <Link href="/admin/products/add">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add New
+                  </Link>
                 </Button>
             </div>
         </CardHeader>
