@@ -13,6 +13,8 @@ import { popularCategories } from '@/data/categories';
 
 
 const Header = () => {
+  const cartItemCount = 1; // Placeholder for actual cart item count
+
   return (
     <header className="bg-header-background text-header-foreground sticky top-0 z-50 shadow-md">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
@@ -52,8 +54,11 @@ const Header = () => {
           <Button variant="ghost" size="sm" className="text-header-foreground hover:bg-primary/80 hover:text-header-foreground relative">
             <ShoppingCart className="h-5 w-5" />
             <span className="sr-only">Cart</span>
-            {/* Optional: Cart count badge */}
-            {/* <span className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">3</span> */}
+            {cartItemCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                {cartItemCount}
+              </span>
+            )}
           </Button>
         </div>
       </div>
