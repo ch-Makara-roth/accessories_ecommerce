@@ -1,4 +1,5 @@
 
+'use client';
 import React from 'react';
 import { products } from '@/data/products';
 import type { Product } from '@/types';
@@ -6,8 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
 import Link from 'next/link';
 import StarRating from '../products/StarRating';
-import { Button } from '../ui/button';
-import { ShoppingCart } from 'lucide-react';
+import AddToCartButton from '../products/AddToCartButton'; // Updated import
 
 const bestSellerProducts: Product[] = products
   .sort((a, b) => (b.reviewCount || 0) * b.rating - (a.reviewCount || 0) * a.rating) // Simple sort logic
@@ -36,9 +36,9 @@ const BestSellerItem: React.FC<BestSellerItemProps> = React.memo(({ product }) =
           </Link>
         <StarRating rating={product.rating} size={14} className="my-1" />
         <p className="text-sm text-primary font-bold">${product.price.toFixed(2)}</p>
-        <Button variant="outline" size="sm" className="mt-2 text-xs">
-          <ShoppingCart className="mr-1 h-3 w-3" /> Add to Cart
-        </Button>
+        <AddToCartButton product={product} size="sm" variant="outline" className="mt-2 text-xs">
+           Add to Cart
+        </AddToCartButton>
       </div>
     </li>
   );

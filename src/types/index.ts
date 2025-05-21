@@ -23,3 +23,8 @@ export type Category = {
   icon?: React.ElementType;
   slug: string;
 };
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+}

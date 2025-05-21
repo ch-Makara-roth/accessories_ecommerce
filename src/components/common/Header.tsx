@@ -1,3 +1,5 @@
+
+'use client';
 import Link from 'next/link';
 import Logo from './Logo';
 import { Button } from '@/components/ui/button';
@@ -10,10 +12,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { popularCategories } from '@/data/categories';
+import { useCart } from '@/context/CartContext';
 
 
 const Header = () => {
-  const cartItemCount = 1; // Placeholder for actual cart item count
+  const { getCartItemCount } = useCart();
+  const cartItemCount = getCartItemCount();
 
   return (
     <header className="bg-header-background text-header-foreground sticky top-0 z-50 shadow-md">
@@ -51,15 +55,17 @@ const Header = () => {
             <User className="h-5 w-5" />
             <span className="sr-only">Account</span>
           </Button>
-          <Button variant="ghost" size="sm" className="text-header-foreground hover:bg-primary/80 hover:text-header-foreground relative">
-            <ShoppingCart className="h-5 w-5" />
-            <span className="sr-only">Cart</span>
-            {cartItemCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                {cartItemCount}
-              </span>
-            )}
-          </Button>
+          <Link href="/cart" passHref>
+            <Button variant="ghost" size="sm" className="text-header-foreground hover:bg-primary/80 hover:text-header-foreground relative">
+              <ShoppingCart className="h-5 w-5" />
+              <span className="sr-only">Cart</span>
+              {cartItemCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                  {cartItemCount}
+                </span>
+              )}
+            </Button>
+          </Link>
         </div>
       </div>
       {/* Mobile Navigation (optional, basic for now) */}

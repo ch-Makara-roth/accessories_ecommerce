@@ -8,8 +8,7 @@ import { products as allProducts, getProductById } from '@/data/products';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Button } from '../ui/button';
-import { ShoppingCart } from 'lucide-react';
+import AddToCartButton from '../products/AddToCartButton'; // Updated import
 
 interface RecommendedProductItemProps {
   product: Product;
@@ -33,9 +32,9 @@ const RecommendedProductItem: React.FC<RecommendedProductItemProps> = React.memo
           <h4 className="text-sm font-semibold text-foreground hover:text-primary transition-colors">{product.name}</h4>
         </Link>
         <p className="text-sm text-primary font-bold">${product.price.toFixed(2)}</p>
-          <Button variant="outline" size="sm" className="mt-2 text-xs">
-            <ShoppingCart className="mr-1 h-3 w-3" /> Add to Cart
-          </Button>
+          <AddToCartButton product={product} size="sm" variant="outline" className="mt-2 text-xs">
+            Add to Cart
+          </AddToCartButton>
       </div>
     </div>
   );

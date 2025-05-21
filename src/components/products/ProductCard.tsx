@@ -1,12 +1,14 @@
 
+'use client';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Product } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import StarRating from './StarRating';
-import { Heart, ShoppingCart } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import React from 'react';
+import AddToCartButton from './AddToCartButton';
 
 interface ProductCardProps {
   product: Product;
@@ -43,16 +45,14 @@ const ProductCard: React.FC<ProductCardProps> = React.memo(({ product }) => {
         </div>
         <p className="text-sm text-muted-foreground mb-3 h-10 overflow-hidden">{product.description}</p>
         <p className="text-lg sm:text-xl font-semibold text-primary mb-1">
-          ${product.price.toFixed(2)}+
+          ${product.price.toFixed(2)}
           {product.originalPrice && (
             <span className="ml-2 text-sm line-through text-muted-foreground">${product.originalPrice.toFixed(2)}</span>
           )}
         </p>
       </CardContent>
       <CardFooter className="p-4 pt-0">
-        <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-          <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
-        </Button>
+        <AddToCartButton product={product} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors" />
       </CardFooter>
     </Card>
   );

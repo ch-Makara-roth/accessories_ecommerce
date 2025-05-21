@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import StarRating from '@/components/products/StarRating';
 import ProductGrid from '@/components/products/ProductGrid';
 import { Separator } from '@/components/ui/separator';
-import { Heart, ShoppingCart, Share2 } from 'lucide-react';
+import { Heart, Share2 } from 'lucide-react';
 import Link from 'next/link';
+import AddToCartButton from '@/components/products/AddToCartButton'; // Added import
 
 interface ProductDetailPageProps {
   params: { id: string };
@@ -77,9 +78,11 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3 mb-6">
-            <Button size="lg" className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90">
-              <ShoppingCart className="mr-2 h-5 w-5" /> Add to Cart
-            </Button>
+            <AddToCartButton 
+              product={product} 
+              size="lg" 
+              className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90" 
+            />
             <Button variant="outline" size="lg" className="text-primary border-primary hover:bg-primary/10">
               <Heart className="mr-2 h-5 w-5" /> Favorite
             </Button>
