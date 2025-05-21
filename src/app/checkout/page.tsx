@@ -9,9 +9,10 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
 import { useRouter } from 'next/navigation'; // For redirecting
+import { MinusCircle, PlusCircle, Trash2 } from 'lucide-react';
 
 export default function CheckoutPage() {
-  const { cartItems, getCartTotal, getCartItemCount, clearCart } = useCart();
+  const { cartItems, getCartTotal, getCartItemCount, clearCart, updateQuantity, removeFromCart } = useCart();
   const router = useRouter();
 
   const shipping = 0.00; // Example free shipping
@@ -120,26 +121,44 @@ export default function CheckoutPage() {
               <CardTitle className="text-xl">Order Summary</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="max-h-60 overflow-y-auto space-y-3 mb-4 pr-2">
+              <div className="max-h-80 overflow-y-auto space-y-4 mb-4 pr-2"> {/* Increased max-h */}
                 {cartItems.map(item => (
-                  <div key={item.product.id} className="flex items-center space-x-3 pb-3 border-b last:border-b-0">
-                    <Image 
-                      src={item.product.image} 
-                      alt={item.product.name} 
-                      width={48} 
-                      height={48} 
-                      className="rounded-md" 
-                      data-ai-hint={item.product.dataAiHint || 'product image'}
-                    />
-                    <div className="flex-grow">
-                      <p className="font-semibold text-sm">{item.product.name}</p>
-                      <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                  <div key={item.product.id} className="flex flex-col space-y-3 pb-3 border-b last:border-b-0">
+                    <div className="flex items-start space-x-3">
+                      <Image
+                        src={item.product.image}
+                        alt={item.product.name}
+                        width={60} 
+                        height={60}
+                        className="rounded-md object-cover aspect-square"
+                        data-ai-hint={item.product.dataAiHint || 'product image'}
+                      />
+                      <div className="flex-grow">
+                        <Link href={`/product/${item.product.id}`} className="hover:text-primary">
+                          <p className="font-semibold text-sm leading-tight">{item.product.name}</p>
+                        </Link>
+                        <p className="text-xs text-muted-foreground">Unit Price: ${item.product.price.toFixed(2)}</p>
+                        <p className="font-semibold text-sm mt-1">${(item.product.price * item.quantity).toFixed(2)}</p>
+                      </div>
                     </div>
-                    <p className="font-semibold text-sm">${(item.product.price * item.quantity).toFixed(2)}</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-1.5">
+                        <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(item.product.id, item.quantity - 1)} disabled={item.quantity <= 1}>
+                          <MinusCircle className="h-3.5 w-3.5" />
+                        </Button>
+                        <span className="w-8 text-center font-medium text-sm">{item.quantity}</span>
+                        <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => updateQuantity(item.product.id, item.quantity + 1)}>
+                          <PlusCircle className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive/80 text-xs px-2 py-1" onClick={() => removeFromCart(item.product.id)}>
+                        <Trash2 className="mr-1 h-3.5 w-3.5" /> Remove
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
-              
+
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
@@ -161,6 +180,9 @@ export default function CheckoutPage() {
                 Place Order
               </Button>
               <Button variant="outline" className="w-full" asChild>
+                <Link href="/cart">Edit Cart</Link>
+              </Button>
+              <Button variant="link" className="w-full text-sm" asChild>
                 <Link href="/">Continue Shopping</Link>
               </Button>
             </CardFooter>
