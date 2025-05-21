@@ -8,44 +8,48 @@ import { ObjectId } from 'mongodb';
 
 // It's good practice for MONGODB_URI to include the database name.
 // This MONGODB_DB_NAME is a fallback or override if needed.
-const DATABASE_NAME = process.env.MONGODB_DB_NAME || 'AudioEmporiumDB';
+const DATABASE_NAME = process.env.MONGODB_DB_NAME || 'accessorice-app'; // Updated fallback
+const COLLECTION_NAME = 'accessorice-app'; // Updated collection name based on user image
 
 export async function GET(request: NextRequest) {
   try {
     if (!DATABASE_NAME) {
-      console.error('API GET /api/products Error: Database name is not configured. MONGODB_DB_NAME env variable is missing and no fallback was set.');
+      console.error(`API GET /api/products Error: Database name is not configured. MONGODB_DB_NAME env variable is missing and fallback was not set or was invalid. Current fallback: ${DATABASE_NAME}`);
       return NextResponse.json({ error: 'Database configuration error', details: 'Database name not found.' }, { status: 500 });
     }
 
     const client = await clientPromise;
     const db = client.db(DATABASE_NAME);
-    const productsCollection = db.collection<Product>('products');
+    const productsCollection = db.collection<Product>(COLLECTION_NAME);
 
-    const products = await productsCollection.find({}).sort({ name: 1 }).toArray();
+    const productsFromDB = await productsCollection.find({}).sort({ name: 1 }).toArray();
 
-    const sanitizedProducts = products.map(product => {
-      const { _id, ...rest } = product;
-      // Ensure all fields are present, providing defaults if necessary
+    const sanitizedProducts = productsFromDB.map(product => {
+      // Ensures that _id is an ObjectId if it's coming from DB as string, or vice-versa for new ObjectId()
+      // However, product._id from MongoDB find() will be an ObjectId.
+      const idStr = product._id ? product._id.toString() : new ObjectId().toString();
+      
+      // Provide defaults for all fields in the Product type
       return {
-        id: _id ? _id.toString() : new ObjectId().toString(), // Fallback if _id is somehow missing
-        name: rest.name || 'Unknown Product',
-        price: typeof rest.price === 'number' ? rest.price : 0,
-        description: rest.description || '',
-        image: rest.image || 'https://placehold.co/600x400.png',
-        category: rest.category || 'uncategorized',
-        rating: typeof rest.rating === 'number' ? rest.rating : 0,
-        reviewCount: typeof rest.reviewCount === 'number' ? rest.reviewCount : 0,
-        originalPrice: typeof rest.originalPrice === 'number' ? rest.originalPrice : undefined,
-        stock: typeof rest.stock === 'number' ? rest.stock : 0,
-        status: rest.status || 'Draft',
-        type: rest.type || '',
-        color: rest.color || '',
-        material: rest.material || '',
-        offer: rest.offer || '',
-        tags: Array.isArray(rest.tags) ? rest.tags : [],
-        dataAiHint: rest.dataAiHint || `${rest.category || 'product'} ${rest.name || 'item'}`.substring(0,50).toLowerCase(),
-        ...rest, // Spread remaining fields, but explicitly defined ones take precedence
-      } as Product;
+        id: idStr,
+        _id: product._id || new ObjectId(idStr), // Ensure _id is ObjectId if it was generated as string
+        name: product.name || 'Unknown Product',
+        price: typeof product.price === 'number' ? product.price : 0,
+        originalPrice: typeof product.originalPrice === 'number' ? product.originalPrice : undefined,
+        rating: typeof product.rating === 'number' ? product.rating : 0,
+        reviewCount: typeof product.reviewCount === 'number' ? product.reviewCount : 0,
+        description: product.description || '',
+        image: product.image || 'https://placehold.co/600x400.png',
+        category: product.category || 'uncategorized',
+        type: product.type || '',
+        color: product.color || '',
+        material: product.material || '',
+        offer: product.offer || '',
+        tags: Array.isArray(product.tags) ? product.tags : [],
+        dataAiHint: product.dataAiHint || `${product.category || 'product'} ${product.name || 'item'}`.substring(0,50).toLowerCase(),
+        stock: typeof product.stock === 'number' ? product.stock : 0,
+        status: product.status || 'Draft',
+      } as Product; // Assert as Product type after ensuring all fields
     });
 
     return NextResponse.json({ products: sanitizedProducts }, { status: 200 });
@@ -63,27 +67,27 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     if (!DATABASE_NAME) {
-      console.error('API POST /api/products Error: Database name is not configured. MONGODB_DB_NAME env variable is missing and no fallback was set.');
+      console.error(`API POST /api/products Error: Database name is not configured. MONGODB_DB_NAME env variable is missing and fallback was not set or was invalid. Current fallback: ${DATABASE_NAME}`);
       return NextResponse.json({ error: 'Database configuration error', details: 'Database name not found.' }, { status: 500 });
     }
 
     const client = await clientPromise;
     const db = client.db(DATABASE_NAME);
-    const productsCollection = db.collection('products');
+    const productsCollection = db.collection(COLLECTION_NAME);
 
     const productData = await request.json();
 
-    // Basic validation - consider using a library like Zod for more complex validation
     if (!productData.name || typeof productData.price !== 'number' || !productData.category || !productData.image || !productData.description) {
-      return NextResponse.json({ error: 'Missing required product fields or incorrect type for price' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing required product fields (name, price, category, image, description) or incorrect type for price' }, { status: 400 });
     }
 
-    const newProduct: Omit<Product, 'id' | '_id' | 'rating' | 'reviewCount'> & { rating?: number; reviewCount?: number } = {
+    // Ensure all fields are present and typed correctly before insertion
+    const newProductDocument = {
       name: productData.name,
       price: parseFloat(productData.price) || 0,
       description: productData.description,
       image: productData.image,
-      category: productData.category.toLowerCase(), // Standardize category
+      category: productData.category.toLowerCase(),
       originalPrice: productData.originalPrice ? parseFloat(productData.originalPrice) : undefined,
       stock: parseInt(productData.stock, 10) || 0,
       status: productData.status || 'Draft',
@@ -91,22 +95,32 @@ export async function POST(request: NextRequest) {
       color: productData.color || '',
       material: productData.material || '',
       offer: productData.offer || '',
-      tags: Array.isArray(productData.tags) ? productData.tags : (productData.tags && typeof productData.tags === 'string' ? productData.tags.split(',').map((t: string) => t.trim()) : []),
-      rating: 0, // Default rating
-      reviewCount: 0, // Default review count
-      dataAiHint: productData.dataAiHint || `${productData.category} ${productData.name}`.substring(0, 50).toLowerCase(),
+      tags: Array.isArray(productData.tags) ? productData.tags : (productData.tags && typeof productData.tags === 'string' ? productData.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []),
+      rating: productData.rating !== undefined ? Number(productData.rating) : 0,
+      reviewCount: productData.reviewCount !== undefined ? Number(productData.reviewCount) : 0,
+      dataAiHint: productData.dataAiHint || `${productData.category || 'product'} ${productData.name || 'item'}`.substring(0, 50).toLowerCase(),
+      // _id will be auto-generated by MongoDB
     };
 
-    const result = await productsCollection.insertOne(newProduct);
+    const result = await productsCollection.insertOne(newProductDocument);
 
     if (!result.insertedId) {
       return NextResponse.json({ error: 'Failed to add product to database' }, { status: 500 });
     }
 
-    const insertedProduct = {
+    const insertedProduct: Product = {
       id: result.insertedId.toString(),
-      ...newProduct
-    } as Product;
+      _id: result.insertedId,
+      ...newProductDocument,
+       // Explicitly cast to ensure all fields of Product are covered by newProductDocument structure
+      name: newProductDocument.name,
+      price: newProductDocument.price,
+      description: newProductDocument.description,
+      image: newProductDocument.image,
+      category: newProductDocument.category,
+      rating: newProductDocument.rating, // already defaulted
+      reviewCount: newProductDocument.reviewCount, // already defaulted
+    };
 
     return NextResponse.json({ message: "Product added", product: insertedProduct }, { status: 201 });
 
@@ -116,6 +130,8 @@ export async function POST(request: NextRequest) {
     if (e instanceof Error) {
       errorMessage = e.message;
     }
+    // It's good to see the actual error in logs if it's a MongoError or similar
+    console.error("Full error object (POST /api/products):", JSON.stringify(e, null, 2));
     return NextResponse.json({ error: 'Failed to add product', details: errorMessage }, { status: 500 });
   }
 }
