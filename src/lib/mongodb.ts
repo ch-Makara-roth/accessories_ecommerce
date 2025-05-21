@@ -4,7 +4,12 @@ import { MongoClient, ServerApiVersion, type MongoClientOptions } from 'mongodb'
 const uri = process.env.MONGODB_URI;
 
 if (!uri) {
-  throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
+  // More specific error message
+  throw new Error(
+    'CRITICAL: MONGODB_URI environment variable is not defined or not accessible. ' +
+    'Please ensure it is correctly set in your .env.local file (e.g., MONGODB_URI="mongodb+srv://user:pass@cluster/dbname?retryWrites=true&w=majority") ' +
+    'and that the Next.js development server has been RESTARTED.'
+  );
 }
 
 // Define options to MongoClient.connect
