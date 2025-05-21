@@ -33,21 +33,25 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       }
       return [...prevItems, { product, quantity: 1 }];
     });
-    toast({
-      title: "Added to Cart!",
-      description: `${product.name} has been added to your cart.`,
-    });
+    setTimeout(() => {
+      toast({
+        title: "Added to Cart!",
+        description: `${product.name} has been added to your cart.`,
+      });
+    }, 0);
   }, [toast]);
 
   const removeFromCart = useCallback((productId: string) => {
     setCartItems(prevItems => {
       const itemToRemove = prevItems.find(item => item.product.id === productId);
       if (itemToRemove) {
-        toast({
-          title: "Item Removed",
-          description: `${itemToRemove.product.name} has been removed from your cart.`,
-          variant: "destructive",
-        });
+        setTimeout(() => {
+          toast({
+            title: "Item Removed",
+            description: `${itemToRemove.product.name} has been removed from your cart.`,
+            variant: "destructive",
+          });
+        }, 0);
       }
       return prevItems.filter(item => item.product.id !== productId);
     });
@@ -67,10 +71,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const clearCart = useCallback(() => {
     setCartItems([]);
-    toast({
-      title: "Cart Cleared",
-      description: "All items have been removed from your cart.",
-    });
+    setTimeout(() => {
+      toast({
+        title: "Cart Cleared",
+        description: "All items have been removed from your cart.",
+      });
+    }, 0);
   }, [toast]);
 
   const getCartTotal = useCallback(() => {
@@ -95,3 +101,4 @@ export const useCart = () => {
   }
   return context;
 };
+
