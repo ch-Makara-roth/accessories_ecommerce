@@ -55,7 +55,7 @@ export default function AdminProductsPage() {
             } else if (errorResponseText) {
                serverErrorMsg += ` (Raw server response snippet: ${errorResponseText.substring(0,150)}...)`;
             }
-            console.error("Failed to parse API error response as JSON. Status:", response.status, parseError);
+            console.error("Client-side: Failed to parse API error response as JSON. This usually means the server sent HTML instead of JSON. Status:", response.status, "Parse Error:", parseError);
             console.error("Original API error response text snippet:", errorResponseText.substring(0, 500));
           }
           throw new Error(serverErrorMsg);
@@ -69,7 +69,7 @@ export default function AdminProductsPage() {
         toast({
           variant: "destructive",
           title: "Error fetching products",
-          description: errorMessage, // This will now include the more detailed hint
+          description: errorMessage,
         });
       } finally {
         setLoading(false);
@@ -234,4 +234,3 @@ export default function AdminProductsPage() {
     </div>
   );
 }
-
