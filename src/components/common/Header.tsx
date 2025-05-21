@@ -17,7 +17,7 @@ import {
   SheetClose,
   SheetTrigger,
   SheetHeader,
-  // SheetTitle, // SheetTitle removed as it's no longer used in this way
+  SheetTitle, // Added SheetTitle
 } from "@/components/ui/sheet";
 import { popularCategories } from '@/data/categories';
 import { useCart } from '@/context/CartContext';
@@ -46,14 +46,18 @@ const Header = () => {
   }, []);
 
   useEffect(() => {
-    setIsMobileMenuOpen(false);
+    // Close mobile menu on route change
+    if (isMobileMenuOpen) {
+      setIsMobileMenuOpen(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
       router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
       setSearchQuery('');
-      setIsMobileMenuOpen(false);
+      setIsMobileMenuOpen(false); // Close mobile menu on search
     }
   };
 
@@ -66,7 +70,7 @@ const Header = () => {
   const NavLinks = () => {
     const baseLinkClasses = "px-2 sm:px-3 py-2 rounded-md text-xs sm:text-sm font-medium text-header-foreground whitespace-nowrap";
     const activeLinkClass = "text-accent font-semibold";
-
+    
     const getLinkClass = (href: string) => cn(
       baseLinkClasses,
       "hover:text-accent",
@@ -80,7 +84,7 @@ const Header = () => {
     );
 
     const commonLinkProps = {
-      onClick: () => setIsMobileMenuOpen(false),
+      onClick: () => setIsMobileMenuOpen(false), // Close mobile menu on link click
     };
 
     return (
@@ -90,7 +94,6 @@ const Header = () => {
             <Button
               variant="ghost"
               className={categoriesButtonClass}
-              {...commonLinkProps}
             >
               Categories <ChevronDown className="h-4 w-4 ml-1" />
             </Button>
@@ -128,14 +131,15 @@ const Header = () => {
             <Logo />
           </div>
 
+          {/* Search bar - visible on all, more prominent on md+ */}
           <div className="flex flex-grow min-w-0 sm:flex-1 sm:max-w-xs md:max-w-sm lg:max-w-md xl:max-w-lg relative">
             <Input
               type="search"
               placeholder="Search products..."
               className={cn(
                 "h-9 pr-10 pl-3 sm:pl-4 w-full text-xs sm:text-sm rounded-md border-primary/30 focus:placeholder:text-muted-foreground",
-                "text-foreground placeholder:text-muted-foreground",
-                isScrolled ? "bg-background focus:bg-background" : "bg-card focus:bg-card"
+                "text-foreground placeholder:text-muted-foreground", // Ensure text is visible
+                isScrolled ? "bg-background focus:bg-background" : "bg-card focus:bg-card" // Adjust background based on scroll
               )}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -153,10 +157,13 @@ const Header = () => {
             </Button>
           </div>
 
+          {/* Right side icons/links - adjusted for all screens */}
           <div className="flex items-center shrink-0 space-x-1 sm:space-x-2">
+            {/* "Sign Up / Login" text link - hidden on xs, visible sm+ */}
             <Link href="/auth" className="hidden sm:inline-block text-xs sm:text-sm font-medium text-header-foreground hover:text-accent px-1 sm:px-2 py-2 rounded-md">
               Sign Up / Login
             </Link>
+            {/* User Icon - visible on all screens as an alternative to text link on xs */}
             <Button variant="ghost" size="icon" className="h-9 w-9 text-header-foreground hover:bg-accent/20 hover:text-accent" asChild>
               <Link href="/auth"><User className="h-5 w-5" /></Link>
             </Button>
@@ -181,7 +188,8 @@ const Header = () => {
               </SheetTrigger>
               <SheetContent side="left" className="w-3/4 sm:w-1/2 p-0 lg:hidden">
                 <SheetHeader className="p-4 border-b flex items-center justify-between">
-                  <Logo />
+                   <SheetTitle className="text-lg font-semibold text-foreground">Menu</SheetTitle> {/* Added SheetTitle */}
+                   <Logo /> {/* Moved Logo here for better alignment if title is present or visually hidden */}
                   <SheetClose asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8">
                       <X className="h-5 w-5" />
@@ -189,7 +197,7 @@ const Header = () => {
                     </Button>
                   </SheetClose>
                 </SheetHeader>
-                <div className="p-4 space-y-2">
+                <div className="p-4 space-y-2"> {/* Adjusted padding and spacing */}
                   <NavLinks />
                   <Separator className="my-3" />
                    <Link href="/auth" passHref>
