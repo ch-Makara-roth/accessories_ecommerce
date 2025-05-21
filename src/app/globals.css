@@ -35,8 +35,8 @@
     --radius: 0.5rem;
 
     /* Specific for Shopcart theme if needed beyond shadcn vars */
-    --header-background: 165 37% 16%; /* Dark Green #1A3C34 */
-    --header-foreground: 0 0% 100%; /* White #FFFFFF */
+    --header-background: 48 27% 94%; /* Light Beige #F2F1EB - Updated */
+    --header-foreground: 165 37% 16%; /* Dark Green #1A3C34 - Updated */
     --banner-background: 48 27% 94%; /* Light Beige #F2F1EB - same as general background */
     --banner-text-primary: 165 37% 16%; /* Dark Green #1A3C34 */
     --banner-text-secondary: 0 0% 100%; /* White #FFFFFF */
@@ -72,8 +72,8 @@
     --input: 220 15% 25%;
     --ring: 120 25% 65%; /* Olive Green */
 
-    --header-background: 220 15% 12%;
-    --header-foreground: 0 0% 95%;
+    --header-background: 220 15% 12%; /* Dark theme header background */
+    --header-foreground: 0 0% 95%; /* Dark theme header text */
     --banner-background: 220 15% 18%;
     --banner-text-primary: 0 0% 95%;
     --banner-text-secondary: 120 25% 65%;
@@ -86,7 +86,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-inter), sans-serif; /* Changed from --font-geist-sans */
+    font-family: var(--font-inter), sans-serif; 
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold;
