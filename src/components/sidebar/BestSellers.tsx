@@ -1,3 +1,4 @@
+
 import { products } from '@/data/products';
 import type { Product } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

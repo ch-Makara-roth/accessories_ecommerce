@@ -1,3 +1,4 @@
+
 import { getProductById, products as allProducts } from '@/data/products';
 import type { Product } from '@/types';
 import Image from 'next/image';
