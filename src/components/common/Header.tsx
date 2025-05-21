@@ -13,11 +13,26 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { popularCategories } from '@/data/categories';
 import { useCart } from '@/context/CartContext';
-
+import { useState, type KeyboardEvent } from 'react';
+import { useRouter } from 'next/navigation';
 
 const Header = () => {
   const { getCartItemCount } = useCart();
   const cartItemCount = getCartItemCount();
+  const [searchQuery, setSearchQuery] = useState('');
+  const router = useRouter();
+
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  const handleKeyPress = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      handleSearch();
+    }
+  };
 
   return (
     <header className="bg-header-background text-header-foreground sticky top-0 z-50 shadow-md">
@@ -45,18 +60,33 @@ const Header = () => {
           <Link href="/whats-new" className="hover:text-gray-300 px-3 py-2 rounded-md text-sm font-medium">What's New</Link>
           <Link href="/delivery" className="hover:text-gray-300 px-3 py-2 rounded-md text-sm font-medium">Delivery</Link>
         </nav>
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="sm" className="text-header-foreground hover:bg-primary/80 hover:text-header-foreground">
-            <Search className="h-5 w-5 mr-1 md:mr-2" />
-            <span className="hidden md:inline">Search</span>
-          </Button>
+        <div className="flex items-center space-x-2 md:space-x-4">
+          <div className="relative flex items-center">
+            <Input
+              type="search"
+              placeholder="Search products..."
+              className="h-9 pr-10 pl-3 text-sm bg-background/20 text-header-foreground placeholder:text-header-foreground/70 border-primary/30 focus:bg-background/30 focus:text-primary-foreground focus:placeholder:text-primary-foreground/70 w-32 md:w-48"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={handleKeyPress}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-0 top-1/2 -translate-y-1/2 h-9 w-9 text-header-foreground hover:bg-primary/80 hover:text-header-foreground"
+              onClick={handleSearch}
+              aria-label="Search"
+            >
+              <Search className="h-5 w-5" />
+            </Button>
+          </div>
           <Link href="/auth" className="hidden sm:inline hover:text-gray-300 px-3 py-2 rounded-md text-sm font-medium">Sign Up / Login</Link>
-          <Button variant="ghost" size="sm" className="text-header-foreground hover:bg-primary/80 hover:text-header-foreground">
+          <Button variant="ghost" size="icon" className="h-9 w-9 text-header-foreground hover:bg-primary/80 hover:text-header-foreground">
             <User className="h-5 w-5" />
             <span className="sr-only">Account</span>
           </Button>
           <Link href="/cart" passHref>
-            <Button variant="ghost" size="sm" className="text-header-foreground hover:bg-primary/80 hover:text-header-foreground relative">
+            <Button variant="ghost" size="icon" className="h-9 w-9 text-header-foreground hover:bg-primary/80 hover:text-header-foreground relative">
               <ShoppingCart className="h-5 w-5" />
               <span className="sr-only">Cart</span>
               {cartItemCount > 0 && (
