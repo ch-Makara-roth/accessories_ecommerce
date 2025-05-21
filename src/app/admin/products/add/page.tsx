@@ -71,7 +71,7 @@ export default function AddProductPage() {
         } catch (e) {
           // If JSON.parse fails, it means the server sent something else (e.g., HTML)
           if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
-             serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This often indicates a server-side configuration issue (e.g., MONGODB_URI in .env.local is missing/incorrect, or an unhandled error in the API route). Please check your server console logs for more details.`;
+             serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This strongly suggests a server-side configuration issue. Please: 1. Verify MONGODB_URI in your .env.local file is correct AND includes your database name. 2. Restart your Next.js server. 3. Check server console logs for more details.`;
           } else if (errorResponseText) {
             serverErrorMsg += ` (Raw server response snippet: ${errorResponseText.substring(0,200)}...)`;
           }
@@ -91,9 +91,9 @@ export default function AddProductPage() {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
       toast({
         variant: 'destructive',
-        title: 'Error adding product',
+        title: 'Error Adding Product',
         description: errorMessage,
-        duration: 7000, // Give more time to read potentially long error messages
+        duration: 9000, // Give more time to read potentially long error messages
       });
       console.error("Error adding product (handleSubmit):", error);
     } finally {
