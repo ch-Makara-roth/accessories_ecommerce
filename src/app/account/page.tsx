@@ -1,19 +1,45 @@
 
-// src/app/account/page.tsx (Customer Dashboard)
+'use client'; // Added 'use client'
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { User, Package, Bell, Settings } from 'lucide-react';
+import { useSession } from 'next-auth/react'; // Import useSession
+import { useRouter } from 'next/navigation'; // Import useRouter
+import { useEffect } from 'react'; // Import useEffect
 
 export default function CustomerDashboardPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    // If session is loading, do nothing yet.
+    // If not authenticated, redirect to auth page.
+    if (status === 'unauthenticated') {
+      router.push('/auth');
+    }
+  }, [session, status, router]);
+
+  if (status === 'loading') {
+    return <div className="text-center py-10">Loading account details...</div>; // Or a spinner component
+  }
+
+  if (!session) {
+    // This case should ideally be handled by the useEffect redirect,
+    // but as a fallback or if redirect hasn't happened yet:
+    return <div className="text-center py-10">Please log in to view your account.</div>;
+  }
+
+  const userName = session.user?.name || session.user?.email || 'Customer';
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-semibold text-foreground flex items-center">
           <User className="mr-3 h-7 w-7 text-primary" />
-          Welcome, Customer!
+          Welcome, {userName}!
         </h1>
-        {/* Placeholder for a potential quick action like "Edit Profile" */}
         <Button variant="outline" asChild>
           <Link href="/account/settings">Edit Profile</Link>
         </Button>
