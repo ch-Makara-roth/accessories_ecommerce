@@ -2,79 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
+    --background: 48 27% 94%; /* Light Beige #F2F1EB */
+    --foreground: 165 37% 16%; /* Dark Green #1A3C34 */
+
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 165 37% 16%; /* Dark Green #1A3C34 */
+
+    --popover: 0 0% 100%; /* White */
+    --popover-foreground: 165 37% 16%; /* Dark Green #1A3C34 */
+
+    --primary: 165 37% 16%; /* Dark Green #1A3C34 */
+    --primary-foreground: 0 0% 100%; /* White #FFFFFF */
+
+    --secondary: 48 25% 90%; /* Darker Beige for subtle contrast */
+    --secondary-foreground: 165 37% 16%; /* Dark Green #1A3C34 */
+
+    --muted: 48 30% 96%; /* Lighter Beige / Off-white */
+    --muted-foreground: 165 37% 40%; /* Muted Dark Green */
+
+    --accent: 120 25% 65%; /* Olive Green #8FBC8F */
+    --accent-foreground: 0 0% 100%; /* White for text on Olive Green */
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+
+    --border: 48 20% 85%; /* Desaturated Beige for borders */
+    --input: 48 20% 85%; /* Desaturated Beige for input backgrounds */
+    --ring: 120 25% 65%; /* Olive Green for focus rings */
+
     --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Specific for Shopcart theme if needed beyond shadcn vars */
+    --header-background: 165 37% 16%; /* Dark Green #1A3C34 */
+    --header-foreground: 0 0% 100%; /* White #FFFFFF */
+    --banner-background: 48 27% 94%; /* Light Beige #F2F1EB - same as general background */
+    --banner-text-primary: 165 37% 16%; /* Dark Green #1A3C34 */
+    --banner-text-secondary: 0 0% 100%; /* White #FFFFFF */
   }
+
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
+    /* A basic dark theme, not the primary focus */
+    --background: 220 15% 10%; /* Dark Blue/Gray */
+    --foreground: 0 0% 90%; /* Light Gray */
+
+    --card: 220 15% 15%;
+    --card-foreground: 0 0% 90%;
+
+    --popover: 220 15% 15%;
+    --popover-foreground: 0 0% 90%;
+
+    --primary: 120 25% 65%; /* Olive Green */
+    --primary-foreground: 165 37% 16%; /* Dark Green */
+
+    --secondary: 220 15% 25%;
+    --secondary-foreground: 0 0% 90%;
+
+    --muted: 220 15% 20%;
+    --muted-foreground: 0 0% 60%;
+
+    --accent: 165 37% 16%; /* Dark Green */
+    --accent-foreground: 0 0% 100%; /* White */
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --border: 220 15% 25%;
+    --input: 220 15% 25%;
+    --ring: 120 25% 65%; /* Olive Green */
+
+    --header-background: 220 15% 12%;
+    --header-foreground: 0 0% 95%;
+    --banner-background: 220 15% 18%;
+    --banner-text-primary: 0 0% 95%;
+    --banner-text-secondary: 120 25% 65%;
   }
 }
 
@@ -84,5 +86,9 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-inter), sans-serif; /* Changed from --font-geist-sans */
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold;
   }
 }
