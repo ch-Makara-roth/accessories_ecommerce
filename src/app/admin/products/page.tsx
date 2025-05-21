@@ -42,9 +42,17 @@ export default function AdminProductsPage() {
       try {
         const response = await fetch('/api/products');
         if (!response.ok) {
-          throw new Error(`Failed to fetch products: ${response.statusText}`);
+          let errorResponseText = await response.text();
+          let serverErrorMsg = `Server responded with ${response.status}: ${response.statusText}`;
+          try {
+            const errorJson = JSON.parse(errorResponseText);
+            serverErrorMsg = errorJson.error || errorJson.details || serverErrorMsg;
+          } catch (e) {
+            console.error("Non-JSON error from server (admin/products):", errorResponseText.substring(0, 500));
+          }
+          throw new Error(serverErrorMsg);
         }
-        const data = await response.json();
+        const data = await response.json(); // If response.ok, we expect JSON
         setProducts(data.products || []);
       } catch (err) {
         console.error(err);
@@ -64,6 +72,8 @@ export default function AdminProductsPage() {
 
   const handleSeeAllClick = () => {
     console.log('See All button clicked. Implement navigation or filter clearing logic here.');
+    // For now, we can just re-fetch or clear local filters if any were applied client-side
+    // Example: refetchProducts(); 
   };
 
   if (loading) {
@@ -159,7 +169,7 @@ export default function AdminProductsPage() {
                     </TableCell>
                     <TableCell className="font-medium flex items-center gap-3">
                       <Image 
-                          src={product.image} 
+                          src={product.image || 'https://placehold.co/40x40.png'} 
                           alt={product.name} 
                           width={40}
                           height={40}
@@ -183,7 +193,6 @@ export default function AdminProductsPage() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                       {/* Placeholder for actions like Edit/Delete - to be implemented */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8">

@@ -3,20 +3,23 @@ import HomePageLayout from '@/components/layouts/HomePageLayout';
 import PromotionalBanner from '@/components/home/PromotionalBanner';
 import ProductGrid from '@/components/products/ProductGrid';
 import FilterBar from '@/components/products/FilterBar';
-// import { products as staticProducts } from '@/data/products'; // We will fetch from API now
 import type { Product } from '@/types';
 
 async function getProducts(): Promise<Product[]> {
-  // In a real app, you might have a different base URL for server-side fetches
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9000';
+  // Ensure NEXT_PUBLIC_APP_URL is set in your .env.local (e.g., NEXT_PUBLIC_APP_URL=http://localhost:9002)
+  // Fallback to localhost:9002 to match the dev script if not set.
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:9002';
   try {
-    const res = await fetch(`${baseUrl}/api/products`, { 
+    const res = await fetch(`${baseUrl}/api/products`, {
       cache: 'no-store' // Or 'force-cache' or revalidate options
     });
     if (!res.ok) {
-      console.error("Failed to fetch products for homepage:", res.status, await res.text());
+      const errorBody = await res.text();
+      console.error(`Failed to fetch products for homepage. Status: ${res.status} ${res.statusText}. URL: ${baseUrl}/api/products. Body: ${errorBody.substring(0, 500)}...`);
       return []; // Return empty array on error
     }
+    // If res.ok, proceed to parse as JSON.
+    // If this line throws the SyntaxError, it means the server sent an HTML page even with a 2xx status, which is highly unusual.
     const data = await res.json();
     return data.products || [];
   } catch (error) {
@@ -41,7 +44,7 @@ export default async function Home() {
         <ProductGrid products={headphoneProducts} />
       ) : (
         <p className="text-center text-muted-foreground py-8">
-          {allProducts.length === 0 ? "Could not load products. Please try again later." : "No headphones found in this category currently."}
+          {allProducts.length === 0 ? "Could not load products. Please check the connection or try again later." : "No headphones found in this category currently."}
         </p>
       )}
     </>
