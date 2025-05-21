@@ -1,6 +1,9 @@
 
+import type { ObjectId } from 'mongodb';
+
 export type Product = {
-  id: string;
+  _id?: ObjectId | string; // MongoDB ID
+  id: string; // string version of _id, for client-side use
   name: string;
   price: number;
   originalPrice?: number;
@@ -15,6 +18,8 @@ export type Product = {
   offer?: string; // e.g., "50% Off"
   tags?: string[];
   dataAiHint?: string;
+  stock?: number;
+  status?: 'Active' | 'Draft' | 'Archived' | 'Scheduled'; // Added from admin form
 };
 
 export type Category = {
