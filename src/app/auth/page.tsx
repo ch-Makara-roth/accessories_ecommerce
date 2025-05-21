@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { useState } from 'react';
 import { Separator } from '@/components/ui/separator';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Chrome, Facebook } from 'lucide-react'; // Added Chrome and Facebook icons
 import { useRouter } from 'next/navigation';
 
 export default function AuthPage() {
@@ -19,9 +19,20 @@ export default function AuthPage() {
   const handleAdminLogin = () => {
     // In a real app, this would trigger an admin-specific authentication flow.
     // For now, it will just redirect to the admin dashboard.
-    // This is NOT secure and is for UI demonstration purposes only.
     router.push('/admin');
   };
+
+  const handleCustomerLogin = () => {
+    // In a real app, this would trigger a customer authentication flow.
+    // For now, it will just redirect to the customer account dashboard.
+    router.push('/account');
+  };
+
+  const handleCustomerSignup = () => {
+    // In a real app, this would trigger a customer signup flow.
+    // For now, it will just redirect to the customer account dashboard.
+    router.push('/account');
+  }
 
   return (
     <div className="flex flex-col justify-center items-center py-12 min-h-[calc(100vh-200px)] gap-10">
@@ -51,9 +62,18 @@ export default function AuthPage() {
                 </div>
                 <Input id="password-login" type="password" required />
               </div>
+              <Separator className="my-4" />
+              <div className="space-y-2">
+                <Button variant="outline" className="w-full" onClick={() => alert('Google Login (Placeholder)')}>
+                  <Chrome className="mr-2 h-4 w-4" /> Login with Google
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => alert('Facebook Login (Placeholder)')}>
+                  <Facebook className="mr-2 h-4 w-4" /> Login with Facebook
+                </Button>
+              </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
-              <Button className="w-full">Login</Button>
+              <Button className="w-full" onClick={handleCustomerLogin}>Login</Button>
               <p className="text-center text-sm text-muted-foreground">
                 Don&apos;t have an account?{' '}
                 <Button variant="link" className="p-0 h-auto text-primary" onClick={() => setActiveTab('signup')}>
@@ -88,9 +108,18 @@ export default function AuthPage() {
                 <Label htmlFor="password-signup">Password</Label>
                 <Input id="password-signup" type="password" required />
               </div>
+               <Separator className="my-4" />
+              <div className="space-y-2">
+                <Button variant="outline" className="w-full" onClick={() => alert('Google Signup (Placeholder)')}>
+                  <Chrome className="mr-2 h-4 w-4" /> Sign up with Google
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => alert('Facebook Signup (Placeholder)')}>
+                  <Facebook className="mr-2 h-4 w-4" /> Sign up with Facebook
+                </Button>
+              </div>
             </CardContent>
              <CardFooter className="flex flex-col gap-4">
-              <Button className="w-full">Create account</Button>
+              <Button className="w-full" onClick={handleCustomerSignup}>Create account</Button>
                <p className="text-center text-sm text-muted-foreground">
                 Already have an account?{' '}
                 <Button variant="link" className="p-0 h-auto text-primary" onClick={() => setActiveTab('login')}>
