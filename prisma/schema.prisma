@@ -14,15 +14,14 @@ model User {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
   name          String?
   email         String?   @unique
-  emailVerified DateTime? // When the email was verified
-  password      String?   // For email/password auth
+  emailVerified DateTime?
   image         String?
+  password      String? // Added for email/password auth
   accounts      Account[]
   sessions      Session[]
-  // role       Role      @default(USER) // Example for role management
+  otps          Otp[] // Relation to Otp model
 }
 
-// For NextAuth's Prisma Adapter
 model Account {
   id                String  @id @default(auto()) @map("_id") @db.ObjectId
   userId            String  @db.ObjectId
@@ -40,6 +39,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -48,29 +48,31 @@ model Session {
   userId       String   @db.ObjectId
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model VerificationToken {
-  identifier String   @id @map("_id")
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
   token      String   @unique
   expires    DateTime
 
   @@unique([identifier, token])
 }
 
-// For OTP
+// Model for storing OTPs
 model Otp {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  email     String
-  otp       String   // Store hashed OTP
+  email     String   // OTP is tied to an email, not necessarily a created user yet
+  otp       String   // This will be the hashed OTP
   expiresAt DateTime
+  userId    String?  @db.ObjectId // Optional: link to user if user is created before OTP verified, or if used for password reset
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([email, otp]) // Should be unique for an email at a given time, but Prisma needs a way to handle this.
-                        // Consider indexing email for faster lookups.
-  @@index([email])
+  createdAt DateTime @default(now()) // Added createdAt
+  updatedAt DateTime @updatedAt     // Added updatedAt
+
+  @@unique([email]) // Ensures only one active OTP per email
+  @@index([userId])
 }
-
-// enum Role {
-//   USER
-//   ADMIN
-// }
