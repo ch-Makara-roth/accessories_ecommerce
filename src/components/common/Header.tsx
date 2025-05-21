@@ -16,6 +16,7 @@ import { useCart } from '@/context/CartContext';
 import { useState, type KeyboardEvent, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useHasMounted } from '@/hooks/use-has-mounted'; // Import the new hook
 
 const Header = () => {
   const { getCartItemCount } = useCart();
@@ -24,12 +25,14 @@ const Header = () => {
   const router = useRouter();
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
+  const hasMounted = useHasMounted(); // Use the hook
 
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
     };
     window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Call handler right away so state is updated with initial scroll position
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
@@ -98,7 +101,7 @@ const Header = () => {
     <header
       className={cn(
         "text-header-foreground sticky top-0 z-50 transition-all duration-300 ease-in-out",
-        isScrolled ? "bg-card shadow-lg" : "bg-header-background shadow-md"
+        hasMounted && isScrolled ? "bg-card shadow-lg" : "bg-header-background shadow-md"
       )}
     >
       <div className="container mx-auto px-4">
@@ -116,7 +119,7 @@ const Header = () => {
               className={cn(
                 "h-9 pr-10 pl-3 sm:pl-4 w-full text-xs sm:text-sm rounded-md border-primary/30 focus:placeholder:text-muted-foreground",
                 "text-foreground placeholder:text-muted-foreground",
-                isScrolled ? "bg-background focus:bg-background" : "bg-card focus:bg-card"
+                hasMounted && isScrolled ? "bg-background focus:bg-background" : "bg-card focus:bg-card"
               )}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
