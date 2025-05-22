@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import { useState, useEffect, useCallback } from 'react';
-import type { Product } from '@/types';
+import type { Product, Category as CategoryType } from '@/types'; // Added CategoryType
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,6 +53,9 @@ export default function AdminProductsPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [availableCategories, setAvailableCategories] = useState<CategoryType[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -76,10 +79,10 @@ export default function AdminProductsPage() {
         }
         throw new Error(serverErrorMsg);
       }
-      const data = await response.json(); 
+      const data = await response.json();
       setProducts(data.products || []);
     } catch (err) {
-      console.error("Full error object in fetchProducts:", err); 
+      console.error("Full error object in fetchProducts:", err);
       const errorToDisplay = err instanceof Error ? err : new Error(String(err));
       
       let description = errorToDisplay.message;
@@ -87,25 +90,51 @@ export default function AdminProductsPage() {
         description = 'Network error or server unreachable. Please check your internet connection and ensure the server is running correctly. Review server console logs for critical errors.';
       } else if (description.includes("Server returned an HTML error page")) {
         // Keep the specific HTML error message
-      } else if (typeof errorResponseText !== 'undefined' && errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
-           description = `Server returned an HTML error page. This often indicates a server-side configuration issue. Please check your server console logs for more details.`;
+      } else if (description.includes("prisma.product is undefined") || description.includes("prisma.product.findMany is not a function") || description.includes("Prisma product model is not accessible")) {
+        description = "Internal Server Error: Prisma product model is not accessible. Ensure `npx prisma generate` has been run and server restarted.";
       }
+
 
       setError(description);
       toast({
         variant: "destructive",
         title: "Error Fetching Products",
         description: description,
-        duration: 9000, 
+        duration: 9000,
       });
     } finally {
       setLoading(false);
     }
-  }, [toast]); // Removed errorResponseText from dependency array as it's defined within the scope
+  }, [toast]);
+
+  const fetchCategoriesForFilter = useCallback(async () => {
+    setIsLoadingCategories(true);
+    try {
+      const response = await fetch('/api/categories');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch categories for filter.' }));
+        throw new Error(errorData.error || `Failed to fetch categories. Status: ${response.status}`);
+      }
+      const data: CategoryType[] = await response.json();
+      setAvailableCategories(data || []);
+    } catch (error) {
+      console.error("Error fetching categories for filter:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error Fetching Categories',
+        description: error instanceof Error ? error.message : String(error),
+      });
+      setAvailableCategories([]); // Ensure it's an empty array on error
+    } finally {
+      setIsLoadingCategories(false);
+    }
+  }, [toast]);
+
 
   useEffect(() => {
     fetchProducts();
-  }, [fetchProducts]);
+    fetchCategoriesForFilter();
+  }, [fetchProducts, fetchCategoriesForFilter]);
 
   const handleSeeAllClick = () => {
     toast({
@@ -274,15 +303,25 @@ export default function AdminProductsPage() {
                     <div className="grid gap-4 py-4">
                       <div className="space-y-2">
                         <Label htmlFor="filter-category">Category</Label>
-                        <Select value={filterCategory} onValueChange={setFilterCategory}>
+                        <Select value={filterCategory} onValueChange={setFilterCategory} disabled={isLoadingCategories}>
                           <SelectTrigger id="filter-category">
-                            <SelectValue placeholder="Select category" />
+                            <SelectValue placeholder={isLoadingCategories ? "Loading categories..." : "Select category"} />
                           </SelectTrigger>
                           <SelectContent>
-                            {/* This should be populated dynamically */}
-                            <SelectItem value="electronics">Electronics</SelectItem>
-                            <SelectItem value="headphones">Headphones</SelectItem>
-                            <SelectItem value="accessories">Accessories</SelectItem>
+                            {isLoadingCategories ? (
+                               <SelectItem value="loading" disabled>Loading categories...</SelectItem>
+                            ) : availableCategories.length === 0 ? (
+                                <SelectItem value="no-categories" disabled>No categories found</SelectItem>
+                            ) : (
+                              <>
+                                <SelectItem value="">All Categories</SelectItem>
+                                {availableCategories.map((cat) => (
+                                  <SelectItem key={cat.id} value={cat.id}>
+                                    {cat.name}
+                                  </SelectItem>
+                                ))}
+                              </>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -293,6 +332,7 @@ export default function AdminProductsPage() {
                             <SelectValue placeholder="Select status" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="">All Statuses</SelectItem>
                             <SelectItem value="Active">Active</SelectItem>
                             <SelectItem value="Draft">Draft</SelectItem>
                             <SelectItem value="Archived">Archived</SelectItem>
@@ -360,3 +400,4 @@ export default function AdminProductsPage() {
     </div>
   );
 }
+
