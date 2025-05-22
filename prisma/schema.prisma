@@ -17,11 +17,9 @@ model User {
   password      String? // Added for credentials auth
   accounts      Account[]
   sessions      Session[]
-  // Optional for a shopping cart
-  // cart          Cart?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  Otp           Otp[] // Relation to Otp model
+  Otps          Otp[] // Relation to Otp model
 }
 
 model Account {
@@ -52,8 +50,7 @@ model Session {
 }
 
 model VerificationToken {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  identifier String
+  identifier String   @id @map("_id")
   token      String   @unique
   expires    DateTime
 
@@ -65,22 +62,12 @@ model Otp {
   email     String
   otp       String
   expiresAt DateTime
-  userId    String?  @db.ObjectId // Optional: associate OTP with a user if they exist
+  userId    String?  @db.ObjectId // Optional: Link OTP to a user if they exist
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([email, otp]) // Ensure OTP is unique per email, or just globally unique
-  @@index([email])
-}
-
-model Category {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  name      String   @unique
-  slug      String   @unique
-  products  Product[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@unique([email, otp]) // Ensure OTPs are unique per email for safety, though one active OTP per email is typical
 }
 
 model Product {
@@ -92,19 +79,26 @@ model Product {
   reviewCount   Int?      @default(0)
   description   String
   image         String
-  
   type          String?
   color         String?
   material      String?
   offer         String?
-  tags          String[]
+  tags          String[]  @default([])
   dataAiHint    String?
   stock         Int?      @default(0)
-  status        String?   @default("Draft") // Active, Draft, Archived, Scheduled
+  status        String?   @default("Draft")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  category      String? // Stores category name as a string
 
-  categoryId String?  @db.ObjectId
-  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull) // If category deleted, set categoryId to null
+  @@map("accessorice-app") // Map this model to the "accessorice-app" collection
+}
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Category {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  name      String    @unique
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  // products  Product[] // If you want a direct relation back from Category to Product
 }

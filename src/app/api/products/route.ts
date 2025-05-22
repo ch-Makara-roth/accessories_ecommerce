@@ -2,19 +2,20 @@
 // src/app/api/products/route.ts
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import prisma from '@/lib/prisma'; // Import Prisma client
+import clientPromise from '@/lib/mongodb'; // Keep for GET for now, or migrate GET too
 import type { Product } from '@/types';
 import { ObjectId } from 'mongodb';
 
-// It's good practice for MONGODB_URI to include the database name.
-// This MONGODB_DB_NAME is a fallback or override if needed.
+
+// Configuration for direct MongoDB client (used by GET)
 const DATABASE_NAME = process.env.MONGODB_DB_NAME || 'accessorice-app';
 const COLLECTION_NAME = 'accessorice-app';
 
 export async function GET(request: NextRequest) {
   try {
     if (!DATABASE_NAME) {
-      console.error(`API GET /api/products Error: Database name is not configured. MONGODB_DB_NAME env variable is missing and fallback was not set or was invalid. Current fallback: ${DATABASE_NAME}`);
+      console.error(`API GET /api/products Error: Database name is not configured. MONGODB_DB_NAME env variable is missing or fallback invalid. Current fallback: ${DATABASE_NAME}`);
       return NextResponse.json({ error: 'Database configuration error', details: 'Database name not found.' }, { status: 500 });
     }
 
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
       const idStr = productDoc._id ? productDoc._id.toString() : new ObjectId().toString();
       return {
         id: idStr,
-        _id: productDoc._id || new ObjectId(idStr),
+        _id: productDoc._id || new ObjectId(idStr), // Ensure _id is present
         name: productDoc.name || 'Unknown Product',
         price: typeof productDoc.price === 'number' ? productDoc.price : 0,
         originalPrice: typeof productDoc.originalPrice === 'number' ? productDoc.originalPrice : undefined,
@@ -45,16 +46,23 @@ export async function GET(request: NextRequest) {
         dataAiHint: productDoc.dataAiHint || `${productDoc.category || 'product'} ${productDoc.name || 'item'}`.substring(0,50).toLowerCase(),
         stock: typeof productDoc.stock === 'number' ? productDoc.stock : 0,
         status: productDoc.status || 'Draft',
+        // Ensure createdAt and updatedAt are handled if needed by Product type, 
+        // or add them to the DB documents if they are not already there.
+        // For now, they are not explicitly part of the Product type used here.
       };
     });
 
     return NextResponse.json({ products: sanitizedProducts }, { status: 200 });
 
-  } catch (e) {
+  } catch (e: any) {
     console.error('API GET /api/products Error:', e);
     let errorMessage = 'An unexpected error occurred while fetching products.';
     if (e instanceof Error) {
       errorMessage = e.message;
+    }
+    // Check if it's a MongoDB specific error and add more details if so
+    if (e.name === 'MongoServerSelectionError' || e.name === 'MongoNetworkError') {
+        errorMessage = `MongoDB Connection Error: ${e.message}. Please verify MONGODB_URI in .env.local and ensure MongoDB Atlas IP Access List includes your current IP. Also, check server console logs.`;
     }
     return NextResponse.json({ error: 'Failed to fetch products', details: errorMessage }, { status: 500 });
   }
@@ -62,20 +70,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!DATABASE_NAME) {
-      console.error(`API POST /api/products Error: Database name is not configured. MONGODB_DB_NAME env variable is missing and fallback was not set or was invalid. Current fallback: ${DATABASE_NAME}`);
-      return NextResponse.json({ error: 'Database configuration error', details: 'Database name not found.' }, { status: 500 });
-    }
-
-    const client = await clientPromise;
-    const db = client.db(DATABASE_NAME);
-    const productsCollection = db.collection(COLLECTION_NAME);
-
     const formData = await request.formData();
     const productFields: Record<string, any> = {};
     
     formData.forEach((value, key) => {
-      if (key !== 'imageFile') { // Exclude the file itself from direct assignment
+      if (key !== 'imageFile') {
         productFields[key] = value;
       }
     });
@@ -84,66 +83,71 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required product fields (name, price, category, description)' }, { status: 400 });
     }
     
-    let imageUrl = 'https://placehold.co/600x400.png?text=No+Image'; // Default if no file
+    let imageUrl = `https://placehold.co/600x400.png?text=${encodeURIComponent(productFields.name.substring(0,20)) || 'No+Image'}`;
     const imageFile = formData.get('imageFile') as File | null;
 
     if (imageFile) {
-      // **SIMULATED IMAGE UPLOAD**
-      // In a real app, you would upload imageFile to cloud storage (S3, Firebase Storage, Cloudinary)
-      // and get back a public URL. For this prototype, we'll use a placeholder.
       console.log(`SIMULATING UPLOAD: Received image file: ${imageFile.name}, size: ${imageFile.size}, type: ${imageFile.type}`);
       imageUrl = `https://placehold.co/600x400.png?text=Uploaded+${encodeURIComponent(imageFile.name.substring(0,20))}`;
-      // **END SIMULATED IMAGE UPLOAD**
+    } else {
+        console.log("No image file provided for product:", productFields.name);
     }
-
-    const newProductDocument = {
-      name: productFields.name,
-      price: parseFloat(productFields.price) || 0,
-      description: productFields.description,
-      image: imageUrl, // Use the (potentially simulated) image URL
-      category: productFields.category.toLowerCase(),
-      originalPrice: productFields.originalPrice ? parseFloat(productFields.originalPrice) : undefined,
-      stock: parseInt(productFields.stock, 10) || 0,
-      status: productFields.status || 'Draft',
-      type: productFields.type || '',
-      color: productFields.color || '',
-      material: productFields.material || '',
-      offer: productFields.offer || '',
+    
+    const dataToCreate: any = {
+      name: String(productFields.name),
+      price: parseFloat(String(productFields.price)) || 0,
+      description: String(productFields.description),
+      image: imageUrl,
+      category: String(productFields.category).toLowerCase(),
+      originalPrice: productFields.originalPrice ? parseFloat(String(productFields.originalPrice)) : null, // Use null for optional Prisma Float
+      stock: productFields.stock ? parseInt(String(productFields.stock), 10) : 0,
+      status: String(productFields.status || 'Draft'),
+      type: productFields.type ? String(productFields.type) : null,
+      color: productFields.color ? String(productFields.color) : null,
+      material: productFields.material ? String(productFields.material) : null,
+      offer: productFields.offer ? String(productFields.offer) : null,
       tags: typeof productFields.tags === 'string' ? productFields.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
-      rating: 0, // Default rating
-      reviewCount: 0, // Default review count
+      // Prisma defaults will handle rating, reviewCount, createdAt, updatedAt
       dataAiHint: `${productFields.category || 'product'} ${productFields.name || 'item'}`.substring(0, 50).toLowerCase(),
-      // _id will be auto-generated by MongoDB
     };
 
-    const result = await productsCollection.insertOne(newProductDocument);
-
-    if (!result.insertedId) {
-      return NextResponse.json({ error: 'Failed to add product to database' }, { status: 500 });
+    // Validate price and stock are numbers
+     if (isNaN(dataToCreate.price)) {
+      return NextResponse.json({ error: 'Price must be a valid number.' }, { status: 400 });
+    }
+    if (dataToCreate.originalPrice !== null && isNaN(dataToCreate.originalPrice)) {
+      return NextResponse.json({ error: 'Original price must be a valid number if provided.' }, { status: 400 });
+    }
+     if (isNaN(dataToCreate.stock)) {
+      return NextResponse.json({ error: 'Stock quantity must be a valid number.' }, { status: 400 });
     }
 
-    const insertedProduct: Product = {
-      id: result.insertedId.toString(),
-      _id: result.insertedId,
-      ...newProductDocument,
-      name: newProductDocument.name, // Ensure these are explicitly part of the returned type
-      price: newProductDocument.price,
-      description: newProductDocument.description,
-      image: newProductDocument.image,
-      category: newProductDocument.category,
-      rating: newProductDocument.rating, 
-      reviewCount: newProductDocument.reviewCount,
-    };
 
-    return NextResponse.json({ message: "Product added", product: insertedProduct }, { status: 201 });
+    const newProduct = await prisma.product.create({
+      data: dataToCreate,
+    });
 
-  } catch (e) {
-    console.error('API POST /api/products Error:', e);
+    return NextResponse.json({ message: "Product added successfully with Prisma", product: newProduct }, { status: 201 });
+
+  } catch (e: any) {
+    console.error('API POST /api/products Error (Prisma):', e);
     let errorMessage = 'An unexpected error occurred while adding the product.';
-    if (e instanceof Error) {
+    let errorDetails = e.message;
+
+    if (e.code === 'P2002' && e.meta?.target) { // Prisma unique constraint violation
+      errorMessage = `A product with this ${e.meta.target.join(', ')} already exists.`;
+      errorDetails = `The field(s) '${e.meta.target.join(', ')}' must be unique.`;
+    } else if (e instanceof Error) {
       errorMessage = e.message;
     }
-    console.error("Full error object (POST /api/products):", JSON.stringify(e, null, 2));
-    return NextResponse.json({ error: 'Failed to add product', details: errorMessage }, { status: 500 });
+    
+    // Check if the error is due to MongoDB connection/configuration issues
+    if (e.message?.includes('MongoServerSelectionError') || e.message?.includes('ECONNREFUSED') || e.message?.includes('ENOTFOUND')) {
+        errorMessage = "MongoDB Connection Error during product creation. Please verify MONGODB_URI / DATABASE_URL in .env.local and ensure MongoDB Atlas IP Access List includes your current IP. Also, check server console logs.";
+        errorDetails = e.message; // Keep original MongoDB error message for details
+    }
+
+
+    return NextResponse.json({ error: 'Failed to add product', details: errorDetails, message: errorMessage }, { status: 500 });
   }
 }
