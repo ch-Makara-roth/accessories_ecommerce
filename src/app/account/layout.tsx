@@ -2,18 +2,20 @@
 'use client';
 
 import Link from 'next/link';
-import { LayoutDashboard, ShoppingBag, Bell, Settings, UserCircle, Package, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Package, Bell, Settings, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from '@/components/ui/sheet';
-import Logo from '@/components/common/Logo'; // Assuming a Logo component exists
+// Import mock notifications to calculate unread count
+import { mockCustomerNotifications } from '@/app/account/notifications/page';
 
 interface AccountNavItem {
   href: string;
   label: string;
   icon: React.ElementType;
+  badgeCount?: number;
 }
 
 export default function AccountLayout({
@@ -24,10 +26,12 @@ export default function AccountLayout({
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
+  const unreadNotificationsCount = mockCustomerNotifications.filter(n => !n.read).length;
+
   const navItems: AccountNavItem[] = [
     { href: '/account', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/account/orders', label: 'My Orders', icon: Package },
-    { href: '/account/notifications', label: 'Notifications', icon: Bell },
+    { href: '/account/notifications', label: 'Notifications', icon: Bell, badgeCount: unreadNotificationsCount },
     { href: '/account/settings', label: 'Settings', icon: Settings },
   ];
 
@@ -52,9 +56,19 @@ export default function AccountLayout({
       )}
       asChild
     >
-      <Link href={item.href}>
-        <item.icon className="mr-3 h-5 w-5 flex-shrink-0" />
-        {item.label}
+      <Link href={item.href} className="flex items-center justify-between w-full">
+        <div className="flex items-center">
+          <item.icon className="mr-3 h-5 w-5 flex-shrink-0" />
+          {item.label}
+        </div>
+        {item.badgeCount && item.badgeCount > 0 && (
+            <span className={cn(
+              "ml-auto inline-block py-0.5 px-2 text-xs font-medium rounded-full",
+              isActive(item.href) ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"
+            )}>
+              {item.badgeCount}
+            </span>
+          )}
       </Link>
     </Button>
   ));

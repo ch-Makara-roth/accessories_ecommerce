@@ -3,7 +3,8 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Bell, Package, PercentCircle } from 'lucide-react';
 
-const mockCustomerNotifications = [
+// Export mock data so it can be imported by the layout
+export const mockCustomerNotifications = [
   {
     id: 'custNotif1',
     icon: Package,
@@ -31,9 +32,20 @@ const mockCustomerNotifications = [
     read: true,
     category: 'Orders',
   },
+  {
+    id: 'custNotif4',
+    icon: PercentCircle,
+    title: 'Flash Sale on Headphones!',
+    description: 'Limited time: Up to 30% off on selected headphones. Ends tonight!',
+    time: '4 hours ago',
+    read: false,
+    category: 'Promotions',
+  },
 ];
 
 export default function CustomerNotificationsPage() {
+  const unreadCount = mockCustomerNotifications.filter(n => !n.read).length;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -41,33 +53,52 @@ export default function CustomerNotificationsPage() {
           <Bell className="mr-3 h-7 w-7 text-primary" />
           My Notifications
         </h1>
-        <span className="text-sm text-muted-foreground">
-          Showing {mockCustomerNotifications.filter(n => !n.read).length} unread notifications
-        </span>
+        {unreadCount > 0 && (
+          <span className="text-sm text-muted-foreground">
+            You have {unreadCount} unread notification{unreadCount > 1 ? 's' : ''}
+          </span>
+        )}
       </div>
 
       <div className="space-y-4">
         {mockCustomerNotifications.length > 0 ? (
           mockCustomerNotifications.map((notification) => (
-            <Card key={notification.id} className={`shadow-sm hover:shadow-md transition-shadow ${!notification.read ? 'border-primary/50 bg-primary/5' : 'bg-card'}`}>
+            <Card 
+              key={notification.id} 
+              className={`shadow-sm hover:shadow-md transition-shadow rounded-lg ${
+                !notification.read ? 'border-primary/50 bg-primary/5 dark:bg-primary/10' : 'bg-card'
+              }`}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center">
-                    <notification.icon className={`mr-3 h-5 w-5 ${!notification.read ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <CardTitle className="text-lg">{notification.title}</CardTitle>
+                    <notification.icon 
+                      className={`mr-3 h-5 w-5 ${
+                        !notification.read ? 'text-primary' : 'text-muted-foreground'
+                      }`} 
+                    />
+                    <CardTitle className={`text-lg ${!notification.read ? 'text-primary-foreground' : 'text-card-foreground'}`}>
+                      {notification.title}
+                    </CardTitle>
                   </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">{notification.time}</span>
+                  <span className={`text-xs whitespace-nowrap ${!notification.read ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                    {notification.time}
+                  </span>
                 </div>
               </CardHeader>
               <CardContent>
-                <CardDescription className={`${!notification.read ? 'text-foreground/90' : 'text-muted-foreground'}`}>
+                <CardDescription className={`${!notification.read ? 'text-primary-foreground/90' : 'text-muted-foreground'}`}>
                   {notification.description}
                 </CardDescription>
                  <div className="mt-3 text-xs">
-                    <span className={`px-2 py-0.5 rounded-full text-foreground/80 font-medium border ${
-                        notification.category === 'Orders' ? 'bg-blue-100 border-blue-300 text-blue-700' :
-                        notification.category === 'Promotions' ? 'bg-purple-100 border-purple-300 text-purple-700' :
-                        'bg-gray-100 border-gray-300 text-gray-700'
+                    <span className={`px-2 py-0.5 rounded-full font-medium border ${
+                        !notification.read 
+                          ? (notification.category === 'Orders' ? 'bg-blue-500/20 border-blue-400 text-blue-100' 
+                            : notification.category === 'Promotions' ? 'bg-purple-500/20 border-purple-400 text-purple-100'
+                            : 'bg-gray-500/20 border-gray-400 text-gray-100')
+                          : (notification.category === 'Orders' ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/50 dark:border-blue-700 dark:text-blue-300' 
+                            : notification.category === 'Promotions' ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/50 dark:border-purple-700 dark:text-purple-300'
+                            : 'bg-gray-100 border-gray-300 text-gray-700 dark:bg-gray-700/50 dark:border-gray-600 dark:text-gray-300')
                     }`}>
                         {notification.category}
                     </span>
