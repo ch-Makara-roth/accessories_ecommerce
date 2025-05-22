@@ -17,11 +17,9 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
+  DialogTrigger,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-  DialogClose,
 } from "@/components/ui/dialog";
 import {
   Accordion,
@@ -47,6 +45,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Product, Category as CategoryType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
+import { DialogOverlay } from '@radix-ui/react-dialog';
 
 
 export default function AdminProductsPage() {
@@ -55,7 +54,7 @@ export default function AdminProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // State for filters applied to the product list
+  // State for active filters applied to the product list
   const [appliedCategoryIds, setAppliedCategoryIds] = useState<string[]>([]);
   const [appliedStatuses, setAppliedStatuses] = useState<string[]>([]);
 
@@ -105,7 +104,7 @@ export default function AdminProductsPage() {
             serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This often indicates a server-side configuration issue (e.g., MONGODB_URI in .env.local is missing/incorrect, or an unhandled error in the API route). Please check your server console logs for more details.`;
           }
         } catch (parseError) {
-          if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
+           if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
             serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This often indicates a server-side configuration issue (e.g., MONGODB_URI in .env.local is missing/incorrect, or an unhandled error in the API route). Please check your server console logs for more details.`;
           } else if (errorResponseText) {
              serverErrorMsg += ` (Client-side: Raw server response snippet: ${errorResponseText.substring(0,150)}...)`;
@@ -122,8 +121,8 @@ export default function AdminProductsPage() {
       const errorToDisplay = err instanceof Error ? err : new Error(String(err));
       
       let description = errorToDisplay.message;
-      if (description === 'Failed to fetch') {
-        description = 'Network error or server unreachable. Please check your internet connection and ensure the server is running correctly. Review server console logs for critical errors.';
+       if (description.includes("Failed to fetch")) {
+        description = "Network error or server unreachable. Please check your internet connection and ensure the server is running correctly. Review server console logs for critical errors.";
       } else if (description.includes("Server returned an HTML error page") || description.includes("Prisma product model is not accessible")) {
         // Keep specific error message
       } else if (description.includes("prisma.product is undefined") || description.includes("prisma.product.findMany is not a function")) {
@@ -173,7 +172,7 @@ export default function AdminProductsPage() {
     fetchCategoriesForFilter();
   }, [fetchCategoriesForFilter]);
 
-  // Initialize dialog state when it opens
+  // Initialize dialog state with applied filters when it opens
   useEffect(() => {
     if (isFilterDialogOpen) {
       setSelectedCategoryIdsInDialog([...appliedCategoryIds]);
@@ -181,34 +180,30 @@ export default function AdminProductsPage() {
     }
   }, [isFilterDialogOpen, appliedCategoryIds, appliedStatuses]);
 
-  const handleApplyFilters = () => {
+
+  const handleApplyDialogFilters = () => {
     setAppliedCategoryIds([...selectedCategoryIdsInDialog]);
     setAppliedStatuses([...selectedStatusesInDialog]);
     
-    const categoryNames = selectedCategoryIdsInDialog
+    const activeCategoryNames = selectedCategoryIdsInDialog
       .map(id => availableCategories.find(cat => cat.id === id)?.name)
-      .filter(Boolean)
-      .join(', ');
+      .filter(Boolean);
 
     let filterDesc = "Filters applied: ";
-    if (categoryNames) filterDesc += `Categories (${categoryNames}) `;
+    if (activeCategoryNames.length > 0) filterDesc += `Categories (${activeCategoryNames.join(', ')}) `;
     if (selectedStatusesInDialog.length > 0) filterDesc += `Statuses (${selectedStatusesInDialog.join(', ')})`;
-    if (!categoryNames && selectedStatusesInDialog.length === 0) filterDesc = "Displaying all products.";
+    
+    if (activeCategoryNames.length === 0 && selectedStatusesInDialog.length === 0) {
+        filterDesc = "Filters updated (no specific category or status selected).";
+    }
 
     toast({
       title: 'Product Filters Updated',
       description: filterDesc,
     });
-    setIsFilterDialogOpen(false);
+    // setIsFilterDialogOpen(false); // Dialog closes via onOpenChange
   };
 
-  const handleClearDialogFilters = () => {
-    setSelectedCategoryIdsInDialog([]);
-    setSelectedStatusesInDialog([]);
-    setCategorySearchTerm('');
-    setStatusSearchTerm('');
-  };
-  
   const handleResetAllFilters = () => {
     setAppliedCategoryIds([]);
     setAppliedStatuses([]);
@@ -220,7 +215,6 @@ export default function AdminProductsPage() {
       title: 'Filters Cleared',
       description: 'Displaying all products.',
     });
-    // fetchProducts will be triggered by useEffect due to appliedCategoryIds/appliedStatuses change
   };
   
   const confirmDeleteProduct = async () => {
@@ -381,7 +375,15 @@ export default function AdminProductsPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <CardTitle className="text-xl font-semibold">Products list</CardTitle>
             <div className="flex items-center gap-2">
-                <Dialog open={isFilterDialogOpen} onOpenChange={setIsFilterDialogOpen}>
+                <Dialog 
+                    open={isFilterDialogOpen} 
+                    onOpenChange={(open) => {
+                        setIsFilterDialogOpen(open);
+                        if (!open) { // Dialog is closing
+                            handleApplyDialogFilters();
+                        }
+                    }}
+                >
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
                         <FilterIcon className="mr-2 h-4 w-4" /> Filters
@@ -392,7 +394,9 @@ export default function AdminProductsPage() {
                         )}
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-sm p-0">
+                  <DialogOverlay className="bg-transparent" />
+                  <DialogContent className="sm:max-w-lg p-0">
+                    {/* Explicit X close button removed */}
                     <DialogHeader className="p-4 border-b">
                       <div className="flex items-center justify-between">
                         <DialogTitle className="text-lg font-semibold">Filters</DialogTitle>
@@ -465,23 +469,7 @@ export default function AdminProductsPage() {
                             </AccordionItem>
                         </Accordion>
                     </div>
-                    <DialogFooter className="p-4 border-t flex justify-between">
-                      <Button type="button" variant="ghost" onClick={handleClearDialogFilters} className="text-sm">
-                        Clear Selections
-                      </Button>
-                      <div className="flex gap-2">
-                        <DialogClose asChild>
-                            <Button type="button" variant="outline" className="text-sm">Cancel</Button>
-                        </DialogClose>
-                        <Button type="button" onClick={handleApplyFilters} className="bg-primary text-primary-foreground hover:bg-primary/90 text-sm">
-                          Apply Filters
-                        </Button>
-                      </div>
-                    </DialogFooter>
-                     <DialogClose className="absolute right-3 top-3 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                        <X className="h-4 w-4" />
-                        <span className="sr-only">Close</span>
-                    </DialogClose>
+                    {/* DialogFooter removed */}
                   </DialogContent>
                 </Dialog>
 
