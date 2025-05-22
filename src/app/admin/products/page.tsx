@@ -47,7 +47,8 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Product, Category as CategoryType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+// Removed Select related imports as they are not used in the filter dialog design provided
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 export default function AdminProductsPage() {
@@ -76,12 +77,14 @@ export default function AdminProductsPage() {
     setError(null);
     let url = '/api/products';
     const queryParams = new URLSearchParams();
-    if (params?.categoryIds && params.categoryIds.length > 0) {
+
+    if (params?.categoryIds && params.categoryIds.length > 0 && !params.categoryIds.includes("all")) {
       queryParams.append('categoryId', params.categoryIds.join(','));
     }
-    if (params?.statuses && params.statuses.length > 0) {
+    if (params?.statuses && params.statuses.length > 0 && !params.statuses.includes("all-statuses")) {
       queryParams.append('status', params.statuses.join(','));
     }
+    
     const queryString = queryParams.toString();
     if (queryString) {
       url += `?${queryString}`;
@@ -95,13 +98,16 @@ export default function AdminProductsPage() {
         try {
           const errorJson = JSON.parse(errorResponseText);
           serverErrorMsg = errorJson.error || errorJson.details || serverErrorMsg;
+           if (serverErrorMsg.includes("<!doctype html>")) { 
+            serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This often indicates a server-side configuration issue (e.g., MONGODB_URI in .env.local is missing/incorrect, or an unhandled error in the API route). Please check your server console logs for more details.`;
+          }
         } catch (parseError) {
           if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
             serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This often indicates a server-side configuration issue (e.g., MONGODB_URI in .env.local is missing/incorrect, or an unhandled error in the API route). Please check your server console logs for more details.`;
           } else if (errorResponseText) {
              serverErrorMsg += ` (Raw server response snippet: ${errorResponseText.substring(0,150)}...)`;
           }
-          console.error("Client-side: Failed to parse API error response as JSON. Status:", response.status, "Error:", parseError);
+          console.error("Client-side: Failed to parse API error response as JSON. Status:", response.status, parseError);
           console.error("Client-side: Original API error response text snippet:", errorResponseText.substring(0, 500));
         }
         throw new Error(serverErrorMsg);
@@ -159,7 +165,7 @@ export default function AdminProductsPage() {
 
   useEffect(() => {
     fetchProducts({ categoryIds: selectedCategoryIds, statuses: selectedStatuses });
-  }, [fetchProducts, selectedCategoryIds, selectedStatuses]); // Re-fetch when filters change
+  }, [fetchProducts, selectedCategoryIds, selectedStatuses]);
 
   useEffect(() => {
     fetchCategoriesForFilter();
@@ -175,21 +181,6 @@ export default function AdminProductsPage() {
       description: 'Displaying all products.',
     });
     setIsFilterDialogOpen(false);
-    // fetchProducts will be called by the useEffect above due to state change
-  };
-
-  const handleApplyFilters = () => {
-    let categoriesToLog = selectedCategoryIds.length > 0 
-        ? selectedCategoryIds.map(id => availableCategories.find(cat => cat.id === id)?.name || id).join(', ') 
-        : 'Any';
-    let statusesToLog = selectedStatuses.length > 0 ? selectedStatuses.join(', ') : 'Any';
-    
-    toast({
-        title: 'Filters Applied',
-        description: `Filtering for Categories: ${categoriesToLog}, Statuses: ${statusesToLog}`,
-    });
-    setIsFilterDialogOpen(false);
-    // fetchProducts will be called by the useEffect above due to state change
   };
   
   const confirmDeleteProduct = async () => {
@@ -215,15 +206,19 @@ export default function AdminProductsPage() {
     }
   };
 
-  const handleCategoryCheckboxChange = (categoryId: string, checked: boolean) => {
+  const handleCategoryCheckboxChange = (categoryId: string) => {
     setSelectedCategoryIds(prev => 
-      checked ? [...prev, categoryId] : prev.filter(id => id !== categoryId)
+      prev.includes(categoryId) 
+        ? prev.filter(id => id !== categoryId) 
+        : [...prev, categoryId]
     );
   };
 
-  const handleStatusCheckboxChange = (statusValue: string, checked: boolean) => {
+  const handleStatusCheckboxChange = (statusValue: string) => {
     setSelectedStatuses(prev =>
-      checked ? [...prev, statusValue] : prev.filter(s => s !== statusValue)
+      prev.includes(statusValue)
+        ? prev.filter(s => s !== statusValue)
+        : [...prev, statusValue]
     );
   };
 
@@ -360,18 +355,19 @@ export default function AdminProductsPage() {
                     <DialogHeader className="p-4 border-b">
                       <div className="flex items-center justify-between">
                         <DialogTitle className="text-lg font-semibold">Filters</DialogTitle>
-                        <Link href="#" className="text-sm text-primary hover:underline">Save view</Link>
+                        <Link href="#" className="text-sm text-primary hover:underline" onClick={(e) => e.preventDefault()}>Save view</Link>
                       </div>
                     </DialogHeader>
                     <div className="p-4 space-y-4">
+                        {/* Placeholder for "Select a view" dropdown if needed later
                         <Select disabled> 
                             <SelectTrigger>
                                 <SelectValue placeholder="Select a view" />
                             </SelectTrigger>
                             <SelectContent>
-                                {/* Placeholder for saved views */}
                             </SelectContent>
                         </Select>
+                        */}
 
                         <Accordion type="multiple" collapsible className="w-full space-y-2"  defaultValue={['category-filter', 'status-filter']}>
                             <AccordionItem value="category-filter" className="border-b-0">
@@ -394,14 +390,14 @@ export default function AdminProductsPage() {
                                                 <Checkbox 
                                                     id={`cat-${cat.id}`} 
                                                     checked={selectedCategoryIds.includes(cat.id)}
-                                                    onCheckedChange={(checked) => handleCategoryCheckboxChange(cat.id, !!checked)}
+                                                    onCheckedChange={() => handleCategoryCheckboxChange(cat.id)}
                                                 />
                                                 <Label htmlFor={`cat-${cat.id}`} className="text-xs font-normal cursor-pointer">{cat.name}</Label>
                                             </div>
                                          )) : <p className="text-xs text-muted-foreground">No categories found.</p>}
                                         </div>
                                     </ScrollArea>
-                                    {/* <Link href="#" className="text-xs text-primary hover:underline mt-1 block">View all...</Link> */}
+                                     <Link href="#" className="text-xs text-primary hover:underline mt-1 block" onClick={(e) => e.preventDefault()}>View all...</Link>
                                 </AccordionContent>
                             </AccordionItem>
                             
@@ -426,26 +422,25 @@ export default function AdminProductsPage() {
                                                 <Checkbox 
                                                     id={`status-${status}`}
                                                     checked={selectedStatuses.includes(status)}
-                                                    onCheckedChange={(checked) => handleStatusCheckboxChange(status, !!checked)}
+                                                    onCheckedChange={() => handleStatusCheckboxChange(status)}
                                                 />
                                                 <Label htmlFor={`status-${status}`} className="text-xs font-normal cursor-pointer">{status}</Label>
                                             </div>
                                         ))}
                                         </div>
                                     </ScrollArea>
-                                    {/* <Link href="#" className="text-xs text-primary hover:underline mt-1 block">View all...</Link> */}
+                                     <Link href="#" className="text-xs text-primary hover:underline mt-1 block" onClick={(e) => e.preventDefault()}>View all...</Link>
                                 </AccordionContent>
                             </AccordionItem>
-                             {/* Add more accordion items for People, Company, Contract type here as placeholders if needed */}
                         </Accordion>
                     </div>
                     <DialogFooter className="p-4 border-t flex justify-between">
                       <Button type="button" variant="ghost" onClick={handleClearFilters} className="text-sm">
                         Clear All
                       </Button>
-                      <Button type="button" onClick={handleApplyFilters} className="bg-primary text-primary-foreground hover:bg-primary/90 text-sm">
-                        Apply Filters
-                      </Button>
+                      <DialogClose asChild>
+                          <Button type="button" variant="outline" className="text-sm">Cancel</Button>
+                      </DialogClose>
                     </DialogFooter>
                      <DialogClose className="absolute right-3 top-3 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
                         <X className="h-4 w-4" />
