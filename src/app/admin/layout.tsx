@@ -36,8 +36,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"; 
+import { Input } from '@/components/ui/input'; // Added Input import
+import { useToast } from '@/hooks/use-toast'; // Added useToast import
 import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type KeyboardEvent } from 'react'; // Added KeyboardEvent
 import Logo from '@/components/common/Logo'; 
 
 
@@ -58,6 +60,9 @@ export default function AdminLayout({
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const mockUnreadNotifications = 3; 
+  const [isSearchVisible, setIsSearchVisible] = useState(false); // State for admin search input
+  const [adminSearchTerm, setAdminSearchTerm] = useState(''); // State for admin search term
+  const { toast } = useToast();
 
   const navItems: AdminNavItem[] = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -94,6 +99,18 @@ export default function AdminLayout({
     setIsSheetOpen(false);
   }, [pathname]);
 
+  const handleAdminSearchSubmit = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' && adminSearchTerm.trim()) {
+      console.log('Admin search submitted:', adminSearchTerm);
+      toast({
+        title: 'Admin Search (Placeholder)',
+        description: `Searched for: "${adminSearchTerm}". Implement actual search logic.`,
+      });
+      // setIsSearchVisible(false); // Optionally hide after search
+      // setAdminSearchTerm('');
+    }
+  };
+
   const renderNavItems = (isMobileSheet: boolean = false) => navItems.map((item) =>
     item.isAccordion && item.subItems ? (
       <Accordion key={item.label} type="single" collapsible className="w-full" defaultValue={isActive(item.href, false) ? item.label : undefined}>
@@ -103,7 +120,7 @@ export default function AdminLayout({
               "w-full justify-between text-left hover:no-underline rounded-md px-3 py-2 text-sm font-medium",
               "hover:bg-muted/80",
               isActive(item.href, false) && !item.subItems?.some(sub => isActive(sub.href))
-                ? "bg-muted text-primary hover:text-primary" // Keep parent primary if no sub-item active
+                ? "bg-muted text-primary hover:text-primary" 
                 : "text-foreground/80 hover:text-foreground",
               item.subItems?.some(sub => isActive(sub.href)) && "text-foreground/80 hover:text-foreground" 
             )}
@@ -200,7 +217,7 @@ export default function AdminLayout({
             <SheetContent side="left" className="w-3/4 max-w-xs p-0 flex flex-col">
                 <SheetHeader className="flex flex-row items-center justify-between h-16 border-b px-4 py-2">
                    <Link href="/admin" onClick={() => setIsSheetOpen(false)}>
-                     <Logo />
+                     <SheetTitle>Admin Menu</SheetTitle>
                    </Link>
                     <SheetTrigger asChild>
                        <Button variant="ghost" size="icon" className="text-muted-foreground">
@@ -226,11 +243,39 @@ export default function AdminLayout({
 
 
           <div className="flex items-center gap-2 ml-auto">
-            <Button variant="ghost" size="icon" className="rounded-full hidden sm:inline-flex">
-              <Search className="h-5 w-5 text-muted-foreground" />
-              <span className="sr-only">Search</span>
-            </Button>
-             <DropdownMenu>
+            {/* Admin Search Area - visible on sm screens and up */}
+            <div className="hidden sm:flex items-center gap-2">
+              {isSearchVisible ? (
+                <>
+                  <Input
+                    type="search"
+                    placeholder="Search admin..."
+                    className="h-9 w-40 md:w-56 text-sm" // Adjusted width
+                    value={adminSearchTerm}
+                    onChange={(e) => setAdminSearchTerm(e.target.value)}
+                    onKeyDown={handleAdminSearchSubmit}
+                    autoFocus
+                  />
+                  <Button variant="ghost" size="icon" onClick={() => { setIsSearchVisible(false); setAdminSearchTerm(''); }}>
+                    <X className="h-5 w-5 text-muted-foreground" />
+                    <span className="sr-only">Close search</span>
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full"
+                  onClick={() => setIsSearchVisible(true)}
+                >
+                  <Search className="h-5 w-5 text-muted-foreground" />
+                  <span className="sr-only">Search</span>
+                </Button>
+              )}
+            </div>
+            
+            {/* User Dropdown Menu */}
+            <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
                   <UserCircle className="h-5 w-5 text-muted-foreground" />
@@ -255,3 +300,4 @@ export default function AdminLayout({
     </div>
   );
 }
+
