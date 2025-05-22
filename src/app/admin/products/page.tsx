@@ -57,11 +57,24 @@ export default function AdminProductsPage() {
   const [availableCategories, setAvailableCategories] = useState<CategoryType[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (params?: { categoryId?: string; status?: string }) => {
     setLoading(true);
     setError(null);
+    let url = '/api/products';
+    const queryParams = new URLSearchParams();
+    if (params?.categoryId && params.categoryId !== 'all') {
+      queryParams.append('categoryId', params.categoryId);
+    }
+    if (params?.status && params.status !== 'all-statuses') {
+      queryParams.append('status', params.status);
+    }
+    const queryString = queryParams.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+
     try {
-      const response = await fetch('/api/products');
+      const response = await fetch(url);
       if (!response.ok) {
         let errorResponseText = await response.text();
         let serverErrorMsg = `Server responded with ${response.status}: ${response.statusText || ''}`;
@@ -131,9 +144,12 @@ export default function AdminProductsPage() {
 
 
   useEffect(() => {
-    fetchProducts();
+    fetchProducts({ categoryId: filterCategory, status: filterStatus });
+  }, [fetchProducts, filterCategory, filterStatus]); // Re-fetch when filters change
+
+  useEffect(() => {
     fetchCategoriesForFilter();
-  }, [fetchProducts, fetchCategoriesForFilter]);
+  }, [fetchCategoriesForFilter]);
 
   const handleSeeAllClick = () => {
     toast({
@@ -142,7 +158,7 @@ export default function AdminProductsPage() {
     });
     setFilterCategory(undefined);
     setFilterStatus(undefined);
-    fetchProducts(); 
+    // fetchProducts will be called by the useEffect above due to state change
   };
 
   const handleApplyFilters = () => {
@@ -155,11 +171,10 @@ export default function AdminProductsPage() {
     const statusToLog = filterStatus === 'all-statuses' || filterStatus === undefined ? 'Any' : filterStatus;
     
     toast({
-        title: 'Filters Applied (Mock)',
-        description: `Category: ${categoryToLog}, Status: ${statusToLog}`,
+        title: 'Filters Applied',
+        description: `Filtering for Category: ${categoryToLog}, Status: ${statusToLog}`,
     });
-    console.log('Applying filters:', { category: filterCategory, status: filterStatus });
-    // Here you would typically re-fetch products with filter query parameters
+    // fetchProducts will be called by the useEffect above due to state change
   };
   
   const confirmDeleteProduct = async () => {
@@ -175,7 +190,7 @@ export default function AdminProductsPage() {
       }
       toast({ title: 'Product Deleted', description: `Product "${productToDelete.name}" has been deleted.` });
       setProductToDelete(null);
-      fetchProducts(); 
+      fetchProducts({ categoryId: filterCategory, status: filterStatus }); // Re-fetch with current filters
     } catch (error) {
       console.error("Error deleting product:", error);
       const errorToDisplay = error instanceof Error ? error : new Error(String(error));
@@ -200,14 +215,14 @@ export default function AdminProductsPage() {
         <div className="text-center py-10 px-4">
           <p className="text-destructive font-semibold mb-2">Error loading products:</p>
           <p className="text-muted-foreground mb-4 text-sm break-words">{error}</p>
-          <Button onClick={() => fetchProducts()} className="mt-4">Try Again</Button>
+          <Button onClick={() => fetchProducts({ categoryId: filterCategory, status: filterStatus })} className="mt-4">Try Again</Button>
         </div>
       );
     }
 
     if (products.length === 0) {
       return (
-        <p className="text-center text-muted-foreground py-8">No products found. Try adding some!</p>
+        <p className="text-center text-muted-foreground py-8">No products found. Try adding some or adjusting filters!</p>
       );
     }
 
@@ -407,4 +422,5 @@ export default function AdminProductsPage() {
     </div>
   );
 }
+
 
