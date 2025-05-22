@@ -36,9 +36,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import { useState, useEffect, useCallback } from 'react';
-import type { Product, Category as CategoryType } from '@/types'; 
+import type { Product, Category as CategoryType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -56,6 +55,8 @@ export default function AdminProductsPage() {
 
   const [availableCategories, setAvailableCategories] = useState<CategoryType[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
+
 
   const fetchProducts = useCallback(async (params?: { categoryId?: string; status?: string }) => {
     setLoading(true);
@@ -136,7 +137,7 @@ export default function AdminProductsPage() {
         title: 'Error Fetching Categories',
         description: error instanceof Error ? error.message : String(error),
       });
-      setAvailableCategories([]); 
+      setAvailableCategories([]);
     } finally {
       setIsLoadingCategories(false);
     }
@@ -145,7 +146,7 @@ export default function AdminProductsPage() {
 
   useEffect(() => {
     fetchProducts({ categoryId: filterCategory, status: filterStatus });
-  }, [fetchProducts, filterCategory, filterStatus]); // Re-fetch when filters change
+  }, [fetchProducts, filterCategory, filterStatus]);
 
   useEffect(() => {
     fetchCategoriesForFilter();
@@ -165,7 +166,7 @@ export default function AdminProductsPage() {
     let categoryToLog = 'Any';
     if (filterCategory && filterCategory !== 'all') {
         const selectedCategory = availableCategories.find(cat => cat.id === filterCategory);
-        categoryToLog = selectedCategory ? selectedCategory.name : filterCategory; 
+        categoryToLog = selectedCategory ? selectedCategory.name : filterCategory;
     }
     
     const statusToLog = filterStatus === 'all-statuses' || filterStatus === undefined ? 'Any' : filterStatus;
@@ -174,6 +175,7 @@ export default function AdminProductsPage() {
         title: 'Filters Applied',
         description: `Filtering for Category: ${categoryToLog}, Status: ${statusToLog}`,
     });
+    setIsFilterDialogOpen(false); // Close dialog after applying
     // fetchProducts will be called by the useEffect above due to state change
   };
   
@@ -190,7 +192,7 @@ export default function AdminProductsPage() {
       }
       toast({ title: 'Product Deleted', description: `Product "${productToDelete.name}" has been deleted.` });
       setProductToDelete(null);
-      fetchProducts({ categoryId: filterCategory, status: filterStatus }); // Re-fetch with current filters
+      fetchProducts({ categoryId: filterCategory, status: filterStatus });
     } catch (error) {
       console.error("Error deleting product:", error);
       const errorToDisplay = error instanceof Error ? error : new Error(String(error));
@@ -248,9 +250,9 @@ export default function AdminProductsPage() {
                 <Checkbox id={`select-${product.id}`} />
               </TableCell>
               <TableCell className="font-medium flex items-center gap-3">
-                <Image 
-                    src={product.image || 'https://placehold.co/40x40.png'} 
-                    alt={product.name} 
+                <Image
+                    src={product.image || 'https://placehold.co/40x40.png'}
+                    alt={product.name}
                     width={40}
                     height={40}
                     className="h-10 w-10 object-cover rounded"
@@ -264,8 +266,8 @@ export default function AdminProductsPage() {
               <TableCell className="text-right">{product.stock || 0}</TableCell>
               <TableCell>
                 <span className={cn("px-2 py-0.5 text-xs rounded-full font-medium",
-                    product.status === 'Active' ? 'bg-green-100 text-green-700' 
-                    : product.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' 
+                    product.status === 'Active' ? 'bg-green-100 text-green-700'
+                    : product.status === 'Scheduled' ? 'bg-blue-100 text-blue-700'
                     : product.status === 'Draft' ? 'bg-yellow-100 text-yellow-700'
                     : 'bg-gray-100 text-gray-700'
                 )}>
@@ -309,25 +311,25 @@ export default function AdminProductsPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <CardTitle className="text-xl font-semibold">Products list</CardTitle>
             <div className="flex items-center gap-2">
-                <Dialog>
+                <Dialog open={isFilterDialogOpen} onOpenChange={setIsFilterDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm">
                         <FilterIcon className="mr-2 h-4 w-4" /> Filter
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
+                  <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                      <DialogTitle>Filter Products</DialogTitle>
+                      <DialogTitle className="text-xl">Filter Products</DialogTitle>
                       <DialogDescription>
-                        Select your filter criteria below.
+                        Refine your product list by selecting category and/or status.
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
+                    <div className="space-y-6 py-4">
                       <div className="space-y-2">
-                        <Label htmlFor="filter-category">Category</Label>
-                        <Select value={filterCategory} onValueChange={setFilterCategory} disabled={isLoadingCategories}>
+                        <Label htmlFor="filter-category" className="text-sm font-medium">Category</Label>
+                        <Select value={filterCategory || undefined} onValueChange={setFilterCategory} disabled={isLoadingCategories}>
                           <SelectTrigger id="filter-category">
-                            <SelectValue placeholder={isLoadingCategories ? "Loading categories..." : "Select category"} />
+                            <SelectValue placeholder={isLoadingCategories ? "Loading categories..." : "All Categories"} />
                           </SelectTrigger>
                           <SelectContent>
                             {isLoadingCategories ? (
@@ -348,10 +350,10 @@ export default function AdminProductsPage() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="filter-status">Status</Label>
-                         <Select value={filterStatus} onValueChange={setFilterStatus}>
+                        <Label htmlFor="filter-status" className="text-sm font-medium">Status</Label>
+                         <Select value={filterStatus || undefined} onValueChange={setFilterStatus}>
                           <SelectTrigger id="filter-status">
-                            <SelectValue placeholder="Select status" />
+                            <SelectValue placeholder="All Statuses" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="all-statuses">All Statuses</SelectItem>
@@ -363,21 +365,19 @@ export default function AdminProductsPage() {
                         </Select>
                       </div>
                     </div>
-                    <DialogFooter>
-                      <DialogClose asChild>
-                        <Button type="button" variant="secondary">
-                          Cancel
-                        </Button>
-                      </DialogClose>
-                      <DialogClose asChild>
-                        <Button type="button" onClick={handleApplyFilters}>Apply Filters</Button>
-                      </DialogClose>
+                    <DialogFooter className="pt-4">
+                      <Button type="button" variant="outline" onClick={() => setIsFilterDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="button" onClick={handleApplyFilters} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                        Apply Filters
+                      </Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
 
                 <Button variant="outline" size="sm" onClick={handleSeeAllClick}>See All</Button>
-                
+
                 <Button className="bg-primary text-primary-foreground hover:bg-primary/90" size="sm" asChild>
                   <Link href="/admin/products/add">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add New
@@ -389,7 +389,7 @@ export default function AdminProductsPage() {
           {renderContent()}
         </CardContent>
       </Card>
-       
+
         {!loading && !error && products.length > 0 && (
           <div className="flex items-center justify-between mt-6">
               <Button variant="outline" size="sm" disabled>Previous</Button>
@@ -422,5 +422,4 @@ export default function AdminProductsPage() {
     </div>
   );
 }
-
-
+    
