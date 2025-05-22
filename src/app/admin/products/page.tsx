@@ -50,7 +50,7 @@ export default function AdminProductsPage() {
   const { toast } = useToast();
 
   const [filterCategory, setFilterCategory] = useState<string | undefined>(undefined);
-  const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined); // Changed initial state
+  const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -146,8 +146,14 @@ export default function AdminProductsPage() {
   };
 
   const handleApplyFilters = () => {
-    const categoryToLog = filterCategory === 'all' || filterCategory === undefined ? 'Any' : filterCategory;
+    let categoryToLog = 'Any';
+    if (filterCategory && filterCategory !== 'all') {
+        const selectedCategory = availableCategories.find(cat => cat.id === filterCategory);
+        categoryToLog = selectedCategory ? selectedCategory.name : filterCategory; // Fallback to ID if name not found
+    }
+    
     const statusToLog = filterStatus === 'all-statuses' || filterStatus === undefined ? 'Any' : filterStatus;
+    
     toast({
         title: 'Filters Applied (Mock)',
         description: `Category: ${categoryToLog}, Status: ${statusToLog}`,
@@ -334,7 +340,7 @@ export default function AdminProductsPage() {
                             <SelectValue placeholder="Select status" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all-statuses">All Statuses</SelectItem> {/* Changed value */}
+                            <SelectItem value="all-statuses">All Statuses</SelectItem>
                             <SelectItem value="Active">Active</SelectItem>
                             <SelectItem value="Draft">Draft</SelectItem>
                             <SelectItem value="Archived">Archived</SelectItem>
