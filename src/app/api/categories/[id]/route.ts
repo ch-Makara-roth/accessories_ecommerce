@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
 
-// Placeholder for slug generation if needed for updates
+// Function to generate a URL-friendly slug
 function generateSlug(name: string): string {
     return name
       .toLowerCase()
@@ -13,11 +13,11 @@ function generateSlug(name: string): string {
       .replace(/--+/g, '-') 
       .replace(/^-+/, '') 
       .replace(/-+$/, ''); 
-  }
+}
 
 const categoryUpdateSchema = z.object({
-  name: z.string().min(1, { message: 'Category name is required.' }).max(100).optional(),
-  // slug: z.string().min(1).optional(), // Slug might be auto-generated from name
+  name: z.string().min(1, { message: 'Category name is required.' }).max(100),
+  // slug is not expected from client, it's derived from name
 });
 
 
@@ -51,6 +51,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  let validatedNameFromRequest: string | undefined;
+  let generatedSlugFromRequest: string | undefined;
+
   try {
     const { id } = params;
     if (!id) {
@@ -61,22 +64,44 @@ export async function PUT(
     const validation = categoryUpdateSchema.safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json({ error: 'Invalid input', details: validation.error.flatten().fieldErrors }, { status: 400 });
+      return NextResponse.json({ 
+        error: 'Invalid input for category name.', 
+        details: validation.error.flatten().fieldErrors 
+      }, { status: 400 });
     }
     
-    const { name } = validation.data;
-    let slug;
-    if (name) {
-        slug = generateSlug(name);
+    validatedNameFromRequest = validation.data.name; // Will be a non-empty string due to schema
+    generatedSlugFromRequest = generateSlug(validatedNameFromRequest);
+
+    if (!generatedSlugFromRequest && validatedNameFromRequest) { 
+        return NextResponse.json({ error: 'Category name must result in a valid slug (e.g., contain alphanumeric characters).' }, { status: 400 });
     }
 
-    const updateData: {name?: string; slug?: string} = {};
-    if (name) updateData.name = name;
-    if (slug) updateData.slug = slug;
-
-    if (Object.keys(updateData).length === 0) {
-        return NextResponse.json({ error: 'No fields to update provided.' }, { status: 400 });
+    // Proactive check for conflicts with *other* categories
+    const conflictingCategoryByName = await prisma.category.findFirst({
+        where: {
+            name: validatedNameFromRequest,
+            id: { not: id } 
+        }
+    });
+    if (conflictingCategoryByName) {
+        return NextResponse.json({ error: `A category with the name "${validatedNameFromRequest}" already exists.` }, { status: 409 });
     }
+
+    const conflictingCategoryBySlug = await prisma.category.findFirst({
+        where: {
+            slug: generatedSlugFromRequest,
+            id: { not: id }
+        }
+    });
+    if (conflictingCategoryBySlug) {
+        return NextResponse.json({ error: `A category with a similar name (resulting in slug "${generatedSlugFromRequest}") already exists. Please choose a different name.` }, { status: 409 });
+    }
+    
+    const updateData = {
+      name: validatedNameFromRequest,
+      slug: generatedSlugFromRequest,
+    };
     
     const updatedCategory = await prisma.category.update({
       where: { id },
@@ -84,19 +109,34 @@ export async function PUT(
     });
 
     return NextResponse.json(updatedCategory, { status: 200 });
+
   } catch (error: any) {
     console.error(`API PUT /api/categories/${params.id} Error:`, error);
-    if (error.code === 'P2025') { // Prisma error code for record not found
-        return NextResponse.json({ error: 'Category not found for update.' }, { status: 404 });
+    let errorMessage = 'Failed to update category.';
+    let status = 500;
+
+    if (error.code === 'P2025') { 
+        errorMessage = 'Category not found for update.';
+        status = 404;
+    } else if (error.code === 'P2002') { 
+        status = 409;
+        const targetFields = error.meta?.target as string[] | string | undefined;
+
+        if (targetFields && (typeof targetFields === 'string' ? targetFields.includes('name') : targetFields.includes('name'))) {
+            errorMessage = `A category with the name "${validatedNameFromRequest || 'the provided name'}" already exists (database constraint).`;
+        } else if (targetFields && (typeof targetFields === 'string' ? targetFields.includes('slug') : targetFields.includes('slug'))) {
+            errorMessage = `A category with a similar name (slug: "${generatedSlugFromRequest || 'derived slug'}") already exists (database constraint).`;
+        } else {
+            errorMessage = 'A category with this name or a similar name already exists (unique constraint violated).';
+        }
+    } else if (error instanceof z.ZodError) { // Should be caught by validation.success check, but as a fallback
+        errorMessage = 'Invalid input: ' + error.errors.map(e => e.message).join(', ');
+        status = 400;
+    } else if (error instanceof Error) { 
+        errorMessage = error.message;
     }
-    if (error.code === 'P2002' && error.meta?.target?.includes('name')) {
-        return NextResponse.json({ error: `Category with name "${error.meta?.values?.[0] || 'provided'}" already exists.` }, { status: 409 });
-    }
-    if (error.code === 'P2002' && error.meta?.target?.includes('slug')) {
-        return NextResponse.json({ error: `Category with slug "${error.meta?.values?.[0] || 'provided'}" already exists.` }, { status: 409 });
-    }
-    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-    return NextResponse.json({ error: 'Failed to update category', details: errorMessage }, { status: 500 });
+    
+    return NextResponse.json({ error: errorMessage, details: error.message || String(error) }, { status });
   }
 }
 
@@ -111,20 +151,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Category ID is required.' }, { status: 400 });
     }
 
-    // Optional: Check if any products are associated with this category
-    // For now, onDelete: SetNull in Product model handles this by nullifying product.categoryId
-
     await prisma.category.delete({
       where: { id },
     });
 
-    return NextResponse.json({ message: 'Category deleted successfully' }, { status: 200 }); // Or 204 No Content
+    return NextResponse.json({ message: 'Category deleted successfully' }, { status: 200 });
   } catch (error: any) {
     console.error(`API DELETE /api/categories/${params.id} Error:`, error);
-    if (error.code === 'P2025') { // Prisma error code for record not found
+    if (error.code === 'P2025') { 
         return NextResponse.json({ error: 'Category not found for deletion.' }, { status: 404 });
     }
-    // Add other specific error handling if needed, e.g., P2003 for foreign key constraint violation if products aren't handled by SetNull
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
     return NextResponse.json({ error: 'Failed to delete category', details: errorMessage }, { status: 500 });
   }
