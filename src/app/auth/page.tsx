@@ -71,7 +71,7 @@ export default function AuthPage() {
 
 
   if (status === 'authenticated') {
-    router.push('/account');
+    router?.push('/account');
     return <div className="text-center py-10">Loading account details...</div>;
   }
   if (status === 'loading' && !searchParams.get('error')) { // Only show main loading if not handling an error

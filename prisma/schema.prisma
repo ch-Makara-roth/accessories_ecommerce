@@ -1,4 +1,3 @@
-
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
@@ -89,9 +88,8 @@ model Product {
   status        String?   @default("Draft")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  category      String? // Stores category name as a string
-
-  @@map("accessorice-app") // Map this model to the "accessorice-app" collection
+  category      Category? @relation(fields: [categoryId], references: [id], name: "ProductToCategory")
+  categoryId    String?   @db.ObjectId
 }
 
 model Category {
@@ -100,5 +98,5 @@ model Category {
   slug      String    @unique
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  // products  Product[] // If you want a direct relation back from Category to Product
+  products  Product[] @relation("ProductToCategory")
 }
