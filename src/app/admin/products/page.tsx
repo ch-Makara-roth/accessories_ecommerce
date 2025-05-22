@@ -47,8 +47,6 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Product, Category as CategoryType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
-// Removed Select related imports as they are not used in the filter dialog design provided
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 export default function AdminProductsPage() {
@@ -57,8 +55,13 @@ export default function AdminProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  // State for filters applied to the product list
+  const [appliedCategoryIds, setAppliedCategoryIds] = useState<string[]>([]);
+  const [appliedStatuses, setAppliedStatuses] = useState<string[]>([]);
+
+  // State for selections within the filter dialog
+  const [selectedCategoryIdsInDialog, setSelectedCategoryIdsInDialog] = useState<string[]>([]);
+  const [selectedStatusesInDialog, setSelectedStatusesInDialog] = useState<string[]>([]);
   
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -78,10 +81,10 @@ export default function AdminProductsPage() {
     let url = '/api/products';
     const queryParams = new URLSearchParams();
 
-    if (params?.categoryIds && params.categoryIds.length > 0 && !params.categoryIds.includes("all")) {
+    if (params?.categoryIds && params.categoryIds.length > 0) {
       queryParams.append('categoryId', params.categoryIds.join(','));
     }
-    if (params?.statuses && params.statuses.length > 0 && !params.statuses.includes("all-statuses")) {
+    if (params?.statuses && params.statuses.length > 0) {
       queryParams.append('status', params.statuses.join(','));
     }
     
@@ -105,7 +108,7 @@ export default function AdminProductsPage() {
           if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
             serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This often indicates a server-side configuration issue (e.g., MONGODB_URI in .env.local is missing/incorrect, or an unhandled error in the API route). Please check your server console logs for more details.`;
           } else if (errorResponseText) {
-             serverErrorMsg += ` (Raw server response snippet: ${errorResponseText.substring(0,150)}...)`;
+             serverErrorMsg += ` (Client-side: Raw server response snippet: ${errorResponseText.substring(0,150)}...)`;
           }
           console.error("Client-side: Failed to parse API error response as JSON. Status:", response.status, parseError);
           console.error("Client-side: Original API error response text snippet:", errorResponseText.substring(0, 500));
@@ -123,7 +126,7 @@ export default function AdminProductsPage() {
         description = 'Network error or server unreachable. Please check your internet connection and ensure the server is running correctly. Review server console logs for critical errors.';
       } else if (description.includes("Server returned an HTML error page") || description.includes("Prisma product model is not accessible")) {
         // Keep specific error message
-      } else if (description.includes("prisma.product is undefined") || description.includes("prisma.product.findMany is not a function") || description.includes("Prisma product model is not accessible")) {
+      } else if (description.includes("prisma.product is undefined") || description.includes("prisma.product.findMany is not a function")) {
         description = "Internal Server Error: Prisma product model is not accessible. Ensure `npx prisma generate` has been run and server restarted.";
       }
 
@@ -162,25 +165,62 @@ export default function AdminProductsPage() {
     }
   }, [toast]);
 
-
   useEffect(() => {
-    fetchProducts({ categoryIds: selectedCategoryIds, statuses: selectedStatuses });
-  }, [fetchProducts, selectedCategoryIds, selectedStatuses]);
+    fetchProducts({ categoryIds: appliedCategoryIds, statuses: appliedStatuses });
+  }, [fetchProducts, appliedCategoryIds, appliedStatuses]);
 
   useEffect(() => {
     fetchCategoriesForFilter();
   }, [fetchCategoriesForFilter]);
 
-  const handleClearFilters = () => {
-    setSelectedCategoryIds([]);
-    setSelectedStatuses([]);
+  // Initialize dialog state when it opens
+  useEffect(() => {
+    if (isFilterDialogOpen) {
+      setSelectedCategoryIdsInDialog([...appliedCategoryIds]);
+      setSelectedStatusesInDialog([...appliedStatuses]);
+    }
+  }, [isFilterDialogOpen, appliedCategoryIds, appliedStatuses]);
+
+  const handleApplyFilters = () => {
+    setAppliedCategoryIds([...selectedCategoryIdsInDialog]);
+    setAppliedStatuses([...selectedStatusesInDialog]);
+    
+    const categoryNames = selectedCategoryIdsInDialog
+      .map(id => availableCategories.find(cat => cat.id === id)?.name)
+      .filter(Boolean)
+      .join(', ');
+
+    let filterDesc = "Filters applied: ";
+    if (categoryNames) filterDesc += `Categories (${categoryNames}) `;
+    if (selectedStatusesInDialog.length > 0) filterDesc += `Statuses (${selectedStatusesInDialog.join(', ')})`;
+    if (!categoryNames && selectedStatusesInDialog.length === 0) filterDesc = "Displaying all products.";
+
+    toast({
+      title: 'Product Filters Updated',
+      description: filterDesc,
+    });
+    setIsFilterDialogOpen(false);
+  };
+
+  const handleClearDialogFilters = () => {
+    setSelectedCategoryIdsInDialog([]);
+    setSelectedStatusesInDialog([]);
+    setCategorySearchTerm('');
+    setStatusSearchTerm('');
+  };
+  
+  const handleResetAllFilters = () => {
+    setAppliedCategoryIds([]);
+    setAppliedStatuses([]);
+    setSelectedCategoryIdsInDialog([]);
+    setSelectedStatusesInDialog([]);
     setCategorySearchTerm('');
     setStatusSearchTerm('');
     toast({
       title: 'Filters Cleared',
       description: 'Displaying all products.',
     });
-    setIsFilterDialogOpen(false);
+    // fetchProducts will be triggered by useEffect due to appliedCategoryIds/appliedStatuses change
   };
   
   const confirmDeleteProduct = async () => {
@@ -196,7 +236,7 @@ export default function AdminProductsPage() {
       }
       toast({ title: 'Product Deleted', description: `Product "${productToDelete.name}" has been deleted.` });
       setProductToDelete(null);
-      fetchProducts({ categoryIds: selectedCategoryIds, statuses: selectedStatuses });
+      fetchProducts({ categoryIds: appliedCategoryIds, statuses: appliedStatuses });
     } catch (error) {
       console.error("Error deleting product:", error);
       const errorToDisplay = error instanceof Error ? error : new Error(String(error));
@@ -207,7 +247,7 @@ export default function AdminProductsPage() {
   };
 
   const handleCategoryCheckboxChange = (categoryId: string) => {
-    setSelectedCategoryIds(prev => 
+    setSelectedCategoryIdsInDialog(prev => 
       prev.includes(categoryId) 
         ? prev.filter(id => id !== categoryId) 
         : [...prev, categoryId]
@@ -215,7 +255,7 @@ export default function AdminProductsPage() {
   };
 
   const handleStatusCheckboxChange = (statusValue: string) => {
-    setSelectedStatuses(prev =>
+    setSelectedStatusesInDialog(prev =>
       prev.includes(statusValue)
         ? prev.filter(s => s !== statusValue)
         : [...prev, statusValue]
@@ -229,7 +269,6 @@ export default function AdminProductsPage() {
   const filteredDisplayStatuses = availableStatuses.filter(status =>
     status.toLowerCase().includes(statusSearchTerm.toLowerCase())
   );
-
 
   const renderContent = () => {
     if (loading) {
@@ -246,7 +285,7 @@ export default function AdminProductsPage() {
         <div className="text-center py-10 px-4">
           <p className="text-destructive font-semibold mb-2">Error loading products:</p>
           <p className="text-muted-foreground mb-4 text-sm break-words">{error}</p>
-          <Button onClick={() => fetchProducts({ categoryIds: selectedCategoryIds, statuses: selectedStatuses })} className="mt-4">Try Again</Button>
+          <Button onClick={() => fetchProducts({ categoryIds: appliedCategoryIds, statuses: appliedStatuses })} className="mt-4">Try Again</Button>
         </div>
       );
     }
@@ -330,6 +369,8 @@ export default function AdminProductsPage() {
     );
   };
 
+  const activeFilterCount = appliedCategoryIds.length + appliedStatuses.length;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -344,9 +385,9 @@ export default function AdminProductsPage() {
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
                         <FilterIcon className="mr-2 h-4 w-4" /> Filters
-                        {(selectedCategoryIds.length > 0 || selectedStatuses.length > 0) && (
+                        {activeFilterCount > 0 && (
                            <span className="ml-2 bg-background text-primary rounded-full px-1.5 py-0.5 text-xs font-semibold">
-                             {selectedCategoryIds.length + selectedStatuses.length}
+                             {activeFilterCount}
                            </span>
                         )}
                     </Button>
@@ -359,16 +400,6 @@ export default function AdminProductsPage() {
                       </div>
                     </DialogHeader>
                     <div className="p-4 space-y-4">
-                        {/* Placeholder for "Select a view" dropdown if needed later
-                        <Select disabled> 
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a view" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            </SelectContent>
-                        </Select>
-                        */}
-
                         <Accordion type="multiple" collapsible className="w-full space-y-2"  defaultValue={['category-filter', 'status-filter']}>
                             <AccordionItem value="category-filter" className="border-b-0">
                                 <AccordionTrigger className="text-sm font-medium hover:no-underline py-2 px-1 rounded hover:bg-muted/50">Category</AccordionTrigger>
@@ -389,7 +420,7 @@ export default function AdminProductsPage() {
                                             <div key={cat.id} className="flex items-center space-x-2">
                                                 <Checkbox 
                                                     id={`cat-${cat.id}`} 
-                                                    checked={selectedCategoryIds.includes(cat.id)}
+                                                    checked={selectedCategoryIdsInDialog.includes(cat.id)}
                                                     onCheckedChange={() => handleCategoryCheckboxChange(cat.id)}
                                                 />
                                                 <Label htmlFor={`cat-${cat.id}`} className="text-xs font-normal cursor-pointer">{cat.name}</Label>
@@ -421,7 +452,7 @@ export default function AdminProductsPage() {
                                             <div key={status} className="flex items-center space-x-2">
                                                 <Checkbox 
                                                     id={`status-${status}`}
-                                                    checked={selectedStatuses.includes(status)}
+                                                    checked={selectedStatusesInDialog.includes(status)}
                                                     onCheckedChange={() => handleStatusCheckboxChange(status)}
                                                 />
                                                 <Label htmlFor={`status-${status}`} className="text-xs font-normal cursor-pointer">{status}</Label>
@@ -435,12 +466,17 @@ export default function AdminProductsPage() {
                         </Accordion>
                     </div>
                     <DialogFooter className="p-4 border-t flex justify-between">
-                      <Button type="button" variant="ghost" onClick={handleClearFilters} className="text-sm">
-                        Clear All
+                      <Button type="button" variant="ghost" onClick={handleClearDialogFilters} className="text-sm">
+                        Clear Selections
                       </Button>
-                      <DialogClose asChild>
-                          <Button type="button" variant="outline" className="text-sm">Cancel</Button>
-                      </DialogClose>
+                      <div className="flex gap-2">
+                        <DialogClose asChild>
+                            <Button type="button" variant="outline" className="text-sm">Cancel</Button>
+                        </DialogClose>
+                        <Button type="button" onClick={handleApplyFilters} className="bg-primary text-primary-foreground hover:bg-primary/90 text-sm">
+                          Apply Filters
+                        </Button>
+                      </div>
                     </DialogFooter>
                      <DialogClose className="absolute right-3 top-3 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
                         <X className="h-4 w-4" />
@@ -449,7 +485,7 @@ export default function AdminProductsPage() {
                   </DialogContent>
                 </Dialog>
 
-                <Button variant="outline" size="sm" onClick={handleClearFilters}>Reset Filters</Button>
+                <Button variant="outline" size="sm" onClick={handleResetAllFilters}>Reset Filters</Button>
 
                 <Button className="bg-primary text-primary-foreground hover:bg-primary/90" size="sm" asChild>
                   <Link href="/admin/products/add">
@@ -495,4 +531,6 @@ export default function AdminProductsPage() {
     </div>
   );
 }
+    
+
     
