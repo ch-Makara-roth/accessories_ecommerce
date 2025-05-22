@@ -404,7 +404,7 @@ export default function AdminProductsPage() {
                       </div>
                     </DialogHeader>
                     <div className="p-4 space-y-4">
-                        <Accordion type="multiple" collapsible className="w-full space-y-2"  defaultValue={['category-filter', 'status-filter']}>
+                        <Accordion type="multiple" className="w-full space-y-2"  defaultValue={['category-filter', 'status-filter']}>
                             <AccordionItem value="category-filter" className="border-b-0">
                                 <AccordionTrigger className="text-sm font-medium hover:no-underline py-2 px-1 rounded hover:bg-muted/50">Category</AccordionTrigger>
                                 <AccordionContent className="pt-2 space-y-2">
