@@ -61,7 +61,7 @@ export default function AdminProductsPage() {
             } else if (errorResponseText) {
                serverErrorMsg += ` (Raw server response snippet: ${errorResponseText.substring(0,150)}...)`;
             }
-            console.error("Client-side: Failed to parse API error response as JSON. This usually means the server sent HTML instead of JSON. Status:", response.status, "Parse Error:", parseError);
+            console.error("Client-side: Failed to parse API error response as JSON. This usually means the server sent HTML instead of JSON. Status:", response.status, parseError);
             console.error("Client-side: Original API error response text snippet:", errorResponseText.substring(0, 500));
           }
           throw new Error(serverErrorMsg);
@@ -69,14 +69,26 @@ export default function AdminProductsPage() {
         const data = await response.json(); 
         setProducts(data.products || []);
       } catch (err) {
-        console.error(err);
-        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-        setError(errorMessage);
+        console.error("Full error object in fetchProducts:", err); 
+        const errorToDisplay = err instanceof Error ? err : new Error(String(err));
+        
+        let description = errorToDisplay.message;
+        if (description === 'Failed to fetch') {
+          description = 'Network error or server unreachable. Please check your internet connection and ensure the server is running correctly. Review server console logs for critical errors.';
+        } else if (description.includes("Server returned an HTML error page")) {
+          // Keep the specific HTML error message
+        } else if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
+            // This condition is already handled above, but as a fallback
+             description = `Server returned an HTML error page (status ${response?.status || 'unknown'}). This often indicates a server-side configuration issue. Please check your server console logs for more details.`;
+        }
+
+
+        setError(description);
         toast({
           variant: "destructive",
-          title: "Error fetching products",
-          description: errorMessage,
-          duration: 7000,
+          title: "Error Fetching Products",
+          description: description,
+          duration: 9000, 
         });
       } finally {
         setLoading(false);
@@ -162,7 +174,7 @@ export default function AdminProductsPage() {
                 />
                 {product.name}
               </TableCell>
-              <TableCell>{product.category}</TableCell>
+              <TableCell>{product.category?.name || product.category || 'N/A'}</TableCell>
               <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
               <TableCell className="text-right">{product.stock || 0}</TableCell>
               <TableCell>

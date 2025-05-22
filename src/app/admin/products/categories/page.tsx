@@ -35,7 +35,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { PlusCircle, Edit2, Trash2, MoreHorizontal, Loader2 } from 'lucide-react';
-import type { Category } from '@/types'; // Ensure Category type is correctly defined/imported
+import type { Category } from '@/types'; 
 import React, { useState, useEffect, type FormEvent } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -62,16 +62,28 @@ export default function AdminCategoriesPage() {
     try {
       const response = await fetch('/api/categories');
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Failed to fetch categories", details: response.statusText }));
+        let errorData;
+        try {
+            errorData = await response.json();
+        } catch (e) {
+            const textError = await response.text();
+            errorData = { error: "Failed to fetch categories", details: textError.substring(0, 200) + (textError.length > 200 ? "..." : "") };
+        }
         throw new Error(errorData.error || `Server responded with ${response.status}`);
       }
       const data: Category[] = await response.json();
       setCategories(data);
     } catch (err) {
-      console.error(err);
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-      setError(errorMessage);
-      toast({ variant: "destructive", title: "Error fetching categories", description: errorMessage });
+      console.error("Full error object in fetchCategories:", err);
+      const errorToDisplay = err instanceof Error ? err : new Error(String(err));
+      
+      let description = errorToDisplay.message;
+      if (description === 'Failed to fetch') {
+        description = 'Network error or server unreachable. Please check your internet connection and ensure the server is running correctly. Review server console logs for critical errors.';
+      }
+      
+      setError(description);
+      toast({ variant: "destructive", title: "Error Fetching Categories", description: description, duration: 9000 });
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +91,7 @@ export default function AdminCategoriesPage() {
 
   useEffect(() => {
     fetchCategories();
-  }, [toast]); // Added toast to dependencies, though it might not be strictly necessary here
+  }, []); // Removed toast from dependencies as fetchCategories doesn't directly use it in a way that should trigger re-fetch
 
   const handleAddCategory = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -101,11 +113,15 @@ export default function AdminCategoriesPage() {
       toast({ title: 'Category Added!', description: `Category "${result.name}" has been added.` });
       setNewCategoryName('');
       setIsAddDialogOpen(false);
-      fetchCategories(); // Re-fetch categories to update the list
+      fetchCategories(); 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-      toast({ variant: 'destructive', title: 'Error Adding Category', description: errorMessage });
       console.error("Error adding category:", error);
+      const errorToDisplay = error instanceof Error ? error : new Error(String(error));
+      let description = errorToDisplay.message;
+      if (description === 'Failed to fetch') {
+        description = 'Network error: Could not add category. Please check your connection and try again.';
+      }
+      toast({ variant: 'destructive', title: 'Error Adding Category', description: description });
     } finally {
       setIsSubmitting(false);
     }
@@ -117,7 +133,6 @@ export default function AdminCategoriesPage() {
       title: 'Edit Category (Mock)',
       description: `Editing category: ${category?.name || 'Unknown'}. Implement edit logic here.`,
     });
-    // Placeholder: In a real app, you would open a dialog similar to Add, pre-filled with category data.
   };
 
   const confirmDeleteCategory = async () => {
@@ -132,12 +147,16 @@ export default function AdminCategoriesPage() {
         throw new Error(result.error || `Failed to delete category. Status: ${response.status}`);
       }
       toast({ title: 'Category Deleted', description: `Category "${categoryToDelete.name}" has been deleted.` });
-      setCategoryToDelete(null); // Close alert dialog
-      fetchCategories(); // Re-fetch
+      setCategoryToDelete(null); 
+      fetchCategories(); 
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-      toast({ variant: 'destructive', title: 'Error Deleting Category', description: errorMessage });
       console.error("Error deleting category:", error);
+      const errorToDisplay = error instanceof Error ? error : new Error(String(error));
+      let description = errorToDisplay.message;
+      if (description === 'Failed to fetch') {
+        description = 'Network error: Could not delete category. Please check your connection and try again.';
+      }
+      toast({ variant: 'destructive', title: 'Error Deleting Category', description: description });
     } finally {
       setIsSubmitting(false);
     }
@@ -276,3 +295,4 @@ export default function AdminCategoriesPage() {
     </div>
   );
 }
+
