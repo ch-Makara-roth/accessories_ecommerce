@@ -15,9 +15,9 @@ import {
   ChevronDown,
   List,
   Shapes,
-  Search, // Added Search icon
-  Menu, // Added Menu icon for mobile
-  X, // Added X icon for mobile sheet close
+  Search, 
+  Menu, 
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -35,16 +35,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"; // Added Sheet components
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"; 
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import Logo from '@/components/common/Logo'; // Assuming you might want a logo in the mobile sheet
+import Logo from '@/components/common/Logo'; 
 
-// No static metadata for client component layout
-// export const metadata: Metadata = {
-//   title: 'Admin Dashboard - Spodut',
-//   description: 'Admin panel for Spodut',
-// };
 
 interface AdminNavItem {
   href: string;
@@ -52,7 +47,7 @@ interface AdminNavItem {
   icon: React.ElementType;
   subItems?: AdminNavItem[];
   isAccordion?: boolean;
-  badgeCount?: number; // Added for notification badge
+  badgeCount?: number; 
 }
 
 export default function AdminLayout({
@@ -62,7 +57,7 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const mockUnreadNotifications = 3; // Placeholder for actual notification count
+  const mockUnreadNotifications = 3; 
 
   const navItems: AdminNavItem[] = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -83,7 +78,7 @@ export default function AdminLayout({
       href: '/admin/notifications',
       label: 'Notifications',
       icon: Bell,
-      badgeCount: mockUnreadNotifications, // Add badge count here
+      badgeCount: mockUnreadNotifications, 
     },
     { href: '/admin/settings', label: 'Settings', icon: Settings },
   ];
@@ -96,7 +91,6 @@ export default function AdminLayout({
   };
 
   useEffect(() => {
-    // Close sheet on route change
     setIsSheetOpen(false);
   }, [pathname]);
 
@@ -109,9 +103,9 @@ export default function AdminLayout({
               "w-full justify-between text-left hover:no-underline rounded-md px-3 py-2 text-sm font-medium",
               "hover:bg-muted/80",
               isActive(item.href, false) && !item.subItems?.some(sub => isActive(sub.href))
-                ? "bg-muted text-primary hover:text-primary"
+                ? "bg-muted text-primary hover:text-primary" // Keep parent primary if no sub-item active
                 : "text-foreground/80 hover:text-foreground",
-              item.subItems?.some(sub => isActive(sub.href)) && "text-foreground/80 hover:text-foreground" // Ensure parent is not primary if child is active
+              item.subItems?.some(sub => isActive(sub.href)) && "text-foreground/80 hover:text-foreground" 
             )}
           >
             <div className="flex items-center">
@@ -203,17 +197,19 @@ export default function AdminLayout({
                 <span className="sr-only">Open menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-3/4 sm:w-64 p-0 flex flex-col">
+            <SheetContent side="left" className="w-3/4 max-w-xs p-0 flex flex-col">
                 <SheetHeader className="flex flex-row items-center justify-between h-16 border-b px-4 py-2">
-                    <Link href="/admin" className="text-xl font-bold text-primary" onClick={() => setIsSheetOpen(false)}>
-                        Admin Panel
-                    </Link>
-                    <Button variant="ghost" size="icon" onClick={() => setIsSheetOpen(false)} className="text-muted-foreground">
+                   <Link href="/admin" onClick={() => setIsSheetOpen(false)}>
+                     <Logo />
+                   </Link>
+                    <SheetTrigger asChild>
+                       <Button variant="ghost" size="icon" className="text-muted-foreground">
                         <X className="h-5 w-5" />
                         <span className="sr-only">Close menu</span>
-                    </Button>
+                      </Button>
+                    </SheetTrigger>
                 </SheetHeader>
-                <nav className="flex-grow p-2 space-y-1 overflow-y-auto">
+                <nav className="flex-grow p-4 space-y-2 overflow-y-auto">
                     {renderNavItems(true)}
                 </nav>
                 <div className="p-4 border-t mt-auto">
@@ -224,7 +220,6 @@ export default function AdminLayout({
             </SheetContent>
           </Sheet>
 
-          {/* Title for mobile view if needed, or leave empty */}
           <div className="md:hidden text-xl font-bold text-primary">
              {/* Can put current page title here if needed, or keep it clean */}
           </div>
@@ -245,7 +240,9 @@ export default function AdminLayout({
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Admin Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => alert('Admin Profile clicked!')}>Profile</DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/profile">Profile</Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => alert('Admin Logout clicked!')}>Logout</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
