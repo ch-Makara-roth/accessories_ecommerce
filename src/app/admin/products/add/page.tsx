@@ -113,7 +113,7 @@ export default function AddProductPage() {
 
     const formData = new FormData();
     formData.append('name', name);
-    formData.append('category', category); // category state holds the ID
+    formData.append('category', category); 
     formData.append('description', description);
     formData.append('price', price);
     if (originalPrice) formData.append('originalPrice', originalPrice);
@@ -135,10 +135,13 @@ export default function AddProductPage() {
       let errorResult;
       let serverErrorMsg = `An unexpected error occurred. Status: ${response.status}`;
       if (!response.ok) {
-        const errorResponseText = await response.text();
+        const errorResponseText = await response.text(); // Body is read here
         try {
           errorResult = JSON.parse(errorResponseText);
           serverErrorMsg = errorResult.error || errorResult.details || `Server responded with ${response.status}`;
+          if (serverErrorMsg.includes("<!doctype html>")) { 
+            serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This strongly suggests a server-side configuration issue. Please: 1. Verify MONGODB_URI in your .env.local file is correct AND includes your database name. 2. Restart your Next.js server. 3. Check server console logs for more details.`;
+          }
         } catch (e) {
            if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
              serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This strongly suggests a server-side configuration issue. Please: 1. Verify MONGODB_URI in your .env.local file is correct AND includes your database name. 2. Restart your Next.js server. 3. Check server console logs for more details.`;
@@ -147,10 +150,10 @@ export default function AddProductPage() {
           }
           console.error("Client-side: Failed to parse API POST error response as JSON. Status:", response.status, "Response text:", errorResponseText.substring(0,500));
         }
-        throw new Error(serverErrorMsg);
+        throw new Error(serverErrorMsg); // This ensures that if !response.ok, execution stops here
       }
 
-      const result = await response.json();
+      const result = await response.json(); // This is only reached if response.ok was true
 
       toast({
         title: 'Success!',
@@ -321,7 +324,6 @@ export default function AddProductPage() {
                     accept="image/*" 
                     onChange={handleImageChange} 
                     className="hidden"
-                    // required is handled by the submit handler check for imageFile
                   />
                 </Label>
                 {imageFile && <p className="text-sm text-muted-foreground mt-2">Selected: {imageFile.name}</p>}
@@ -352,6 +354,4 @@ export default function AddProductPage() {
     </div>
   );
 }
-    
-
     
