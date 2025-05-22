@@ -1,13 +1,11 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-generator client {
-  provider = "prisma-client-js"
-}
 
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
 }
 
 model User {
@@ -16,10 +14,14 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  password      String? // Added for email/password auth
+  password      String? // Added for credentials auth
   accounts      Account[]
   sessions      Session[]
-  otps          Otp[] // Relation to Otp model
+  // Optional for a shopping cart
+  // cart          Cart?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  Otp           Otp[] // Relation to Otp model
 }
 
 model Account {
@@ -39,7 +41,6 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
-  @@index([userId])
 }
 
 model Session {
@@ -48,8 +49,6 @@ model Session {
   userId       String   @db.ObjectId
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
 }
 
 model VerificationToken {
@@ -61,18 +60,51 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// Model for storing OTPs
 model Otp {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  email     String   // OTP is tied to an email, not necessarily a created user yet
-  otp       String   // This will be the hashed OTP
+  email     String
+  otp       String
   expiresAt DateTime
-  userId    String?  @db.ObjectId // Optional: link to user if user is created before OTP verified, or if used for password reset
+  userId    String?  @db.ObjectId // Optional: associate OTP with a user if they exist
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  createdAt DateTime @default(now()) // Added createdAt
-  updatedAt DateTime @updatedAt     // Added updatedAt
+  @@unique([email, otp]) // Ensure OTP is unique per email, or just globally unique
+  @@index([email])
+}
 
-  @@unique([email]) // Ensures only one active OTP per email
-  @@index([userId])
+model Category {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   @unique
+  slug      String   @unique
+  products  Product[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  price         Float
+  originalPrice Float?
+  rating        Float     @default(0)
+  reviewCount   Int?      @default(0)
+  description   String
+  image         String
+  
+  type          String?
+  color         String?
+  material      String?
+  offer         String?
+  tags          String[]
+  dataAiHint    String?
+  stock         Int?      @default(0)
+  status        String?   @default("Draft") // Active, Draft, Archived, Scheduled
+
+  categoryId String?  @db.ObjectId
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull) // If category deleted, set categoryId to null
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

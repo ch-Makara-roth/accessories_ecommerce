@@ -1,6 +1,16 @@
 
 import type { ObjectId } from 'mongodb';
 
+export type Category = {
+  id: string;
+  _id?: ObjectId | string; // MongoDB ID, if needed directly
+  name: string;
+  slug: string;
+  icon?: React.ElementType; // Kept for potential future use, not directly in DB model for now
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
 export type Product = {
   _id?: ObjectId | string; // MongoDB ID
   id: string; // string version of _id, for client-side use
@@ -11,7 +21,7 @@ export type Product = {
   reviewCount?: number;
   description: string;
   image: string;
-  category: string;
+  
   type?: string; // e.g., "Wireless", "Wired"
   color?: string;
   material?: string;
@@ -20,14 +30,11 @@ export type Product = {
   dataAiHint?: string;
   stock?: number;
   status?: 'Active' | 'Draft' | 'Archived' | 'Scheduled'; // Added from admin form
+
+  categoryId?: string | null; // Foreign key
+  category?: Category | null; // Nested category object
 };
 
-export type Category = {
-  id: string;
-  name: string;
-  icon?: React.ElementType;
-  slug: string;
-};
 
 export interface CartItem {
   product: Product;
