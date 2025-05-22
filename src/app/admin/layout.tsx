@@ -27,6 +27,14 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"; // Added Sheet components
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -71,9 +79,9 @@ export default function AdminLayout({
     { href: '/admin/sales', label: 'Sales', icon: DollarSign },
     { href: '/admin/users', label: 'Customers', icon: Users },
     { href: '/admin/analytics', label: 'Analytics', icon: LineChart },
-    { 
-      href: '/admin/notifications', 
-      label: 'Notifications', 
+    {
+      href: '/admin/notifications',
+      label: 'Notifications',
       icon: Bell,
       badgeCount: mockUnreadNotifications, // Add badge count here
     },
@@ -100,8 +108,10 @@ export default function AdminLayout({
             className={cn(
               "w-full justify-between text-left hover:no-underline rounded-md px-3 py-2 text-sm font-medium",
               "hover:bg-muted/80",
-              isActive(item.href, false) && !item.subItems?.some(sub => isActive(sub.href)) && "bg-muted text-primary hover:text-primary",
-              !isActive(item.href, false) && "text-foreground/80 hover:text-foreground"
+              isActive(item.href, false) && !item.subItems?.some(sub => isActive(sub.href))
+                ? "bg-muted text-primary hover:text-primary"
+                : "text-foreground/80 hover:text-foreground",
+              item.subItems?.some(sub => isActive(sub.href)) && "text-foreground/80 hover:text-foreground" // Ensure parent is not primary if child is active
             )}
           >
             <div className="flex items-center">
@@ -213,7 +223,7 @@ export default function AdminLayout({
                 </div>
             </SheetContent>
           </Sheet>
-          
+
           {/* Title for mobile view if needed, or leave empty */}
           <div className="md:hidden text-xl font-bold text-primary">
              {/* Can put current page title here if needed, or keep it clean */}
@@ -225,10 +235,20 @@ export default function AdminLayout({
               <Search className="h-5 w-5 text-muted-foreground" />
               <span className="sr-only">Search</span>
             </Button>
-             <Button variant="ghost" size="icon" className="rounded-full">
-              <UserCircle className="h-5 w-5 text-muted-foreground" />
-              <span className="sr-only">Admin Profile</span>
-            </Button>
+             <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <UserCircle className="h-5 w-5 text-muted-foreground" />
+                  <span className="sr-only">Admin Profile</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>My Admin Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => alert('Admin Profile clicked!')}>Profile</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => alert('Admin Logout clicked!')}>Logout</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
         <main className="flex-1 p-6 overflow-auto">
