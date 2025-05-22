@@ -11,8 +11,8 @@ export async function GET(request: NextRequest) {
   console.log('API GET /api/products: Received request.');
 
   const { searchParams } = new URL(request.url);
-  const categoryIdFilter = searchParams.get('categoryId');
-  const statusFilter = searchParams.get('status');
+  const categoryIdsParam = searchParams.get('categoryId');
+  const statusesParam = searchParams.get('status');
 
   if (!prisma) {
     console.error('API GET /api/products: CRITICAL - Prisma client (imported as `prisma`) is undefined!');
@@ -26,11 +26,19 @@ export async function GET(request: NextRequest) {
 
   try {
     const whereClause: Prisma.ProductWhereInput = {};
-    if (categoryIdFilter && categoryIdFilter !== 'all') {
-      whereClause.categoryId = categoryIdFilter;
+    
+    if (categoryIdsParam) {
+      const categoryIds = categoryIdsParam.split(',');
+      if (categoryIds.length > 0) {
+        whereClause.categoryId = { in: categoryIds };
+      }
     }
-    if (statusFilter && statusFilter !== 'all-statuses') {
-      whereClause.status = statusFilter;
+
+    if (statusesParam) {
+      const statuses = statusesParam.split(',');
+      if (statuses.length > 0) {
+        whereClause.status = { in: statuses };
+      }
     }
 
     console.log('API GET /api/products: Using whereClause:', JSON.stringify(whereClause));
@@ -38,7 +46,7 @@ export async function GET(request: NextRequest) {
     const productsFromDB = await prisma.product.findMany({
       where: whereClause,
       orderBy: { name: 'asc' },
-      include: { category: true }, // Include category data
+      include: { category: true },
     });
 
     const sanitizedProducts: Product[] = productsFromDB.map(productDoc => ({
@@ -101,9 +109,10 @@ export async function POST(request: NextRequest) {
     console.error('API POST /api/products: CRITICAL - Prisma client (imported as `prisma`) is undefined!');
     return NextResponse.json({ error: 'Internal Server Error: Prisma client is not initialized. Check server logs, DATABASE_URL in .env.local, and ensure server was restarted.' }, { status: 500 });
   }
-  if (!prisma.product || typeof prisma.product.create !== 'function') {
-      console.error('API POST /api/products: CRITICAL - prisma.product or prisma.product.create is undefined/not a function. This strongly suggests `npx prisma generate` has not been run successfully or the server needs a restart after schema changes. Check server console logs.');
-      return NextResponse.json({ error: 'Internal Server Error: Prisma product model is not accessible (cannot call .create). Ensure `npx prisma generate` has been run and server restarted.' }, { status: 500 });
+   if (!prisma.product || typeof prisma.product.create !== 'function') {
+    const errorMsg = 'Internal Server Error: Prisma product model not accessible. Ensure `npx prisma generate` has been run and server restarted.';
+    console.error(`API POST /api/products: CRITICAL - prisma.product or prisma.product.create is undefined/not a function. This strongly suggests \`npx prisma generate\` has not been run successfully or the server needs a restart after schema changes. Prisma object: ${JSON.stringify(prisma, Object.getOwnPropertyNames(prisma))}`);
+    return NextResponse.json({ error: errorMsg, message: errorMsg }, { status: 500 });
   }
   console.log('API POST /api/products: Prisma client and prisma.product.create seem available.');
 
@@ -126,7 +135,6 @@ export async function POST(request: NextRequest) {
 
     if (imageFile) {
       console.log(`API POST /api/products: SIMULATING UPLOAD - Received image file: ${imageFile.name}, size: ${imageFile.size}, type: ${imageFile.type}. Using placeholder URL.`);
-      // In a real app, upload to cloud storage and get URL
       imageUrl = `https://placehold.co/600x400.png?text=Uploaded+${encodeURIComponent(imageFile.name.substring(0,15))}`;
     } else {
         console.log("API POST /api/products: No image file provided for product:", productFields.name);
@@ -160,11 +168,11 @@ export async function POST(request: NextRequest) {
       material: productFields.material ? String(productFields.material) : undefined,
       offer: productFields.offer ? String(productFields.offer) : undefined,
       tags: typeof productFields.tags === 'string' ? productFields.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
-      rating: 0, // Default value
-      reviewCount: 0, // Default value
+      rating: 0, 
+      reviewCount: 0,
     };
 
-    let categoryNameForHint = 'product'; // Default if no category
+    let categoryNameForHint = 'product'; 
     const categoryId = productFields.category ? String(productFields.category) : null;
 
     if (categoryId && categoryId.trim() !== '' && /^[0-9a-fA-F]{24}$/.test(categoryId)) {
@@ -177,7 +185,11 @@ export async function POST(request: NextRequest) {
             console.warn(`API POST /api/products: Category with ID "${categoryId}" not found for product "${dataToCreate.name}". Product will be created without category linkage.`);
           }
         } catch (catError: any) {
-          console.error(`API POST /api/products: Error finding category with ID "${categoryId}" for product "${dataToCreate.name}":`, catError.message);
+           if (catError.code === 'P2023' && catError.message?.includes('Malformed ObjectID')) { // Prisma error for malformed ID
+             console.warn(`API POST /api/products: Provided category ID "${categoryId}" for product "${dataToCreate.name}" is not a valid ObjectId format according to Prisma. Product will be created without category linkage.`);
+           } else {
+            console.error(`API POST /api/products: Error finding category with ID "${categoryId}" for product "${dataToCreate.name}":`, catError.message);
+           }
         }
     } else if (categoryId && categoryId.trim() !== '') {
         console.warn(`API POST /api/products: Provided category ID "${categoryId}" for product "${dataToCreate.name}" is not a valid ObjectId format. Product will be created without category linkage.`);
@@ -186,14 +198,8 @@ export async function POST(request: NextRequest) {
 
     dataToCreate.dataAiHint = `${categoryNameForHint} ${dataToCreate.name || 'item'}`.substring(0, 50).toLowerCase();
 
-
     console.log('API POST /api/products: Attempting to create product with data:', JSON.stringify(dataToCreate, null, 2));
-
-    if (!prisma || !prisma.product || typeof prisma.product.create !== 'function') {
-      console.error('API POST /api/products: CRITICAL - prisma.product.create is undefined/not a function. This suggests `npx prisma generate` was not run or failed, or server needs restart.');
-      return NextResponse.json({ error: 'Internal Server Error: Prisma product model not accessible for creation.', message: 'Internal Server Error: Prisma product model not accessible for creation. Ensure `npx prisma generate` has been run and server restarted.' }, { status: 500 });
-    }
-
+    
     const newProduct = await prisma.product.create({ data: dataToCreate });
     console.log('API POST /api/products: Product created successfully:', newProduct.id);
 
@@ -204,16 +210,14 @@ export async function POST(request: NextRequest) {
     let errorMessage = 'An unexpected error occurred while adding the product.';
     let errorDetails = e.message || String(e);
 
-    if (e instanceof Prisma.PrismaClientKnownRequestError) {
-        if (e.code === 'P2002' && e.meta?.target) {
-          errorMessage = `A product with this ${Array.isArray(e.meta.target) ? e.meta.target.join(', ') : e.meta.target} already exists.`;
-          errorDetails = `The field(s) '${Array.isArray(e.meta.target) ? e.meta.target.join(', ') : e.meta.target}' must be unique.`;
-        } else if (e.code === 'P2023' && e.message?.includes('Malformed ObjectID')) {
-          errorMessage = `Invalid Category ID format. Please ensure a valid category is selected. Details: ${e.message}`;
-          errorDetails = e.message;
-        } else if (e.code === 'P2025' ) {
-            errorMessage = "Record not found. The category ID you tried to connect might not exist."
-        }
+    if (e.code === 'P2002' && e.meta?.target) { // Unique constraint failed
+        errorMessage = `A product with this ${Array.isArray(e.meta.target) ? e.meta.target.join(', ') : e.meta.target} already exists.`;
+        errorDetails = `The field(s) '${Array.isArray(e.meta.target) ? e.meta.target.join(', ') : e.meta.target}' must be unique.`;
+    } else if (e.code === 'P2023' && e.message?.includes('Malformed ObjectID')) {
+        errorMessage = `Invalid Category ID format. Please ensure a valid category is selected. Details: ${e.message}`;
+        errorDetails = e.message;
+    } else if (e.code === 'P2025' ) {
+        errorMessage = "Record not found. The category ID you tried to connect might not exist."
     } else if (e.message && e.message.includes("Argument `category`: Invalid value provided. Expected String or Null, provided Object.")) {
       errorMessage = "Prisma schema mismatch for 'category' field during product creation. Please ensure `npx prisma generate` has been run successfully after defining the Product-Category relation in your `schema.prisma` and that your server has been restarted. This is a critical step for Prisma to understand your data model correctly."
       errorDetails = e.message;
@@ -228,6 +232,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to add product', details: errorDetails, message: errorMessage }, { status: 500 });
   }
 }
-    
-
     

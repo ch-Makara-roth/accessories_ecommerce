@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from "@/components/ui/checkbox";
-import { PlusCircle, Search, Edit2, Trash2, MoreHorizontal, Filter as FilterIcon, Loader2 } from 'lucide-react';
+import { PlusCircle, Search, Edit2, Trash2, MoreHorizontal, Filter as FilterIcon, Loader2, X } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -17,13 +17,18 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +39,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useState, useEffect, useCallback } from 'react';
 import type { Product, Category as CategoryType } from '@/types';
@@ -48,8 +56,9 @@ export default function AdminProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const [filterCategory, setFilterCategory] = useState<string | undefined>(undefined);
-  const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -57,17 +66,21 @@ export default function AdminProductsPage() {
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
 
+  const [categorySearchTerm, setCategorySearchTerm] = useState('');
+  const [statusSearchTerm, setStatusSearchTerm] = useState('');
 
-  const fetchProducts = useCallback(async (params?: { categoryId?: string; status?: string }) => {
+  const availableStatuses = ['Active', 'Draft', 'Archived', 'Scheduled'];
+
+  const fetchProducts = useCallback(async (params?: { categoryIds?: string[]; statuses?: string[] }) => {
     setLoading(true);
     setError(null);
     let url = '/api/products';
     const queryParams = new URLSearchParams();
-    if (params?.categoryId && params.categoryId !== 'all') {
-      queryParams.append('categoryId', params.categoryId);
+    if (params?.categoryIds && params.categoryIds.length > 0) {
+      queryParams.append('categoryId', params.categoryIds.join(','));
     }
-    if (params?.status && params.status !== 'all-statuses') {
-      queryParams.append('status', params.status);
+    if (params?.statuses && params.statuses.length > 0) {
+      queryParams.append('status', params.statuses.join(','));
     }
     const queryString = queryParams.toString();
     if (queryString) {
@@ -103,7 +116,7 @@ export default function AdminProductsPage() {
       if (description === 'Failed to fetch') {
         description = 'Network error or server unreachable. Please check your internet connection and ensure the server is running correctly. Review server console logs for critical errors.';
       } else if (description.includes("Server returned an HTML error page") || description.includes("Prisma product model is not accessible")) {
-        // Keep the specific HTML error message
+        // Keep specific error message
       } else if (description.includes("prisma.product is undefined") || description.includes("prisma.product.findMany is not a function") || description.includes("Prisma product model is not accessible")) {
         description = "Internal Server Error: Prisma product model is not accessible. Ensure `npx prisma generate` has been run and server restarted.";
       }
@@ -145,37 +158,37 @@ export default function AdminProductsPage() {
 
 
   useEffect(() => {
-    fetchProducts({ categoryId: filterCategory, status: filterStatus });
-  }, [fetchProducts, filterCategory, filterStatus]);
+    fetchProducts({ categoryIds: selectedCategoryIds, statuses: selectedStatuses });
+  }, [fetchProducts, selectedCategoryIds, selectedStatuses]); // Re-fetch when filters change
 
   useEffect(() => {
     fetchCategoriesForFilter();
   }, [fetchCategoriesForFilter]);
 
-  const handleSeeAllClick = () => {
+  const handleClearFilters = () => {
+    setSelectedCategoryIds([]);
+    setSelectedStatuses([]);
+    setCategorySearchTerm('');
+    setStatusSearchTerm('');
     toast({
       title: 'Filters Cleared',
       description: 'Displaying all products.',
     });
-    setFilterCategory(undefined);
-    setFilterStatus(undefined);
+    setIsFilterDialogOpen(false);
     // fetchProducts will be called by the useEffect above due to state change
   };
 
   const handleApplyFilters = () => {
-    let categoryToLog = 'Any';
-    if (filterCategory && filterCategory !== 'all') {
-        const selectedCategory = availableCategories.find(cat => cat.id === filterCategory);
-        categoryToLog = selectedCategory ? selectedCategory.name : filterCategory;
-    }
-    
-    const statusToLog = filterStatus === 'all-statuses' || filterStatus === undefined ? 'Any' : filterStatus;
+    let categoriesToLog = selectedCategoryIds.length > 0 
+        ? selectedCategoryIds.map(id => availableCategories.find(cat => cat.id === id)?.name || id).join(', ') 
+        : 'Any';
+    let statusesToLog = selectedStatuses.length > 0 ? selectedStatuses.join(', ') : 'Any';
     
     toast({
         title: 'Filters Applied',
-        description: `Filtering for Category: ${categoryToLog}, Status: ${statusToLog}`,
+        description: `Filtering for Categories: ${categoriesToLog}, Statuses: ${statusesToLog}`,
     });
-    setIsFilterDialogOpen(false); // Close dialog after applying
+    setIsFilterDialogOpen(false);
     // fetchProducts will be called by the useEffect above due to state change
   };
   
@@ -192,7 +205,7 @@ export default function AdminProductsPage() {
       }
       toast({ title: 'Product Deleted', description: `Product "${productToDelete.name}" has been deleted.` });
       setProductToDelete(null);
-      fetchProducts({ categoryId: filterCategory, status: filterStatus });
+      fetchProducts({ categoryIds: selectedCategoryIds, statuses: selectedStatuses });
     } catch (error) {
       console.error("Error deleting product:", error);
       const errorToDisplay = error instanceof Error ? error : new Error(String(error));
@@ -201,6 +214,27 @@ export default function AdminProductsPage() {
       setIsDeleting(false);
     }
   };
+
+  const handleCategoryCheckboxChange = (categoryId: string, checked: boolean) => {
+    setSelectedCategoryIds(prev => 
+      checked ? [...prev, categoryId] : prev.filter(id => id !== categoryId)
+    );
+  };
+
+  const handleStatusCheckboxChange = (statusValue: string, checked: boolean) => {
+    setSelectedStatuses(prev =>
+      checked ? [...prev, statusValue] : prev.filter(s => s !== statusValue)
+    );
+  };
+
+  const filteredDisplayCategories = availableCategories.filter(cat => 
+    cat.name.toLowerCase().includes(categorySearchTerm.toLowerCase())
+  );
+
+  const filteredDisplayStatuses = availableStatuses.filter(status =>
+    status.toLowerCase().includes(statusSearchTerm.toLowerCase())
+  );
+
 
   const renderContent = () => {
     if (loading) {
@@ -217,7 +251,7 @@ export default function AdminProductsPage() {
         <div className="text-center py-10 px-4">
           <p className="text-destructive font-semibold mb-2">Error loading products:</p>
           <p className="text-muted-foreground mb-4 text-sm break-words">{error}</p>
-          <Button onClick={() => fetchProducts({ categoryId: filterCategory, status: filterStatus })} className="mt-4">Try Again</Button>
+          <Button onClick={() => fetchProducts({ categoryIds: selectedCategoryIds, statuses: selectedStatuses })} className="mt-4">Try Again</Button>
         </div>
       );
     }
@@ -313,70 +347,114 @@ export default function AdminProductsPage() {
             <div className="flex items-center gap-2">
                 <Dialog open={isFilterDialogOpen} onOpenChange={setIsFilterDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">
-                        <FilterIcon className="mr-2 h-4 w-4" /> Filter
+                    <Button variant="outline" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
+                        <FilterIcon className="mr-2 h-4 w-4" /> Filters
+                        {(selectedCategoryIds.length > 0 || selectedStatuses.length > 0) && (
+                           <span className="ml-2 bg-background text-primary rounded-full px-1.5 py-0.5 text-xs font-semibold">
+                             {selectedCategoryIds.length + selectedStatuses.length}
+                           </span>
+                        )}
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle className="text-xl">Filter Products</DialogTitle>
-                      <DialogDescription>
-                        Refine your product list by selecting category and/or status.
-                      </DialogDescription>
+                  <DialogContent className="sm:max-w-sm p-0">
+                    <DialogHeader className="p-4 border-b">
+                      <div className="flex items-center justify-between">
+                        <DialogTitle className="text-lg font-semibold">Filters</DialogTitle>
+                        <Link href="#" className="text-sm text-primary hover:underline">Save view</Link>
+                      </div>
                     </DialogHeader>
-                    <div className="space-y-6 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="filter-category" className="text-sm font-medium">Category</Label>
-                        <Select value={filterCategory || undefined} onValueChange={setFilterCategory} disabled={isLoadingCategories}>
-                          <SelectTrigger id="filter-category">
-                            <SelectValue placeholder={isLoadingCategories ? "Loading categories..." : "All Categories"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {isLoadingCategories ? (
-                               <SelectItem value="loading" disabled>Loading categories...</SelectItem>
-                            ) : (
-                              <>
-                                <SelectItem value="all">All Categories</SelectItem>
-                                {availableCategories.length > 0 ? availableCategories.map((cat) => (
-                                  <SelectItem key={cat.id} value={cat.id}>
-                                    {cat.name}
-                                  </SelectItem>
-                                )) : (
-                                  <SelectItem value="no-categories-found" disabled>No categories found</SelectItem>
-                                )}
-                              </>
-                            )}
-                          </SelectContent>
+                    <div className="p-4 space-y-4">
+                        <Select disabled> 
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a view" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {/* Placeholder for saved views */}
+                            </SelectContent>
                         </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="filter-status" className="text-sm font-medium">Status</Label>
-                         <Select value={filterStatus || undefined} onValueChange={setFilterStatus}>
-                          <SelectTrigger id="filter-status">
-                            <SelectValue placeholder="All Statuses" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all-statuses">All Statuses</SelectItem>
-                            <SelectItem value="Active">Active</SelectItem>
-                            <SelectItem value="Draft">Draft</SelectItem>
-                            <SelectItem value="Archived">Archived</SelectItem>
-                            <SelectItem value="Scheduled">Scheduled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+
+                        <Accordion type="multiple" collapsible className="w-full space-y-2"  defaultValue={['category-filter', 'status-filter']}>
+                            <AccordionItem value="category-filter" className="border-b-0">
+                                <AccordionTrigger className="text-sm font-medium hover:no-underline py-2 px-1 rounded hover:bg-muted/50">Category</AccordionTrigger>
+                                <AccordionContent className="pt-2 space-y-2">
+                                    <div className="relative">
+                                        <Input 
+                                            placeholder="Search categories..." 
+                                            value={categorySearchTerm}
+                                            onChange={(e) => setCategorySearchTerm(e.target.value)}
+                                            className="pl-8 text-xs h-8"
+                                        />
+                                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    </div>
+                                    <ScrollArea className="h-[150px] pr-3">
+                                        <div className="space-y-1.5">
+                                        {isLoadingCategories ? <p className="text-xs text-muted-foreground">Loading categories...</p> :
+                                         filteredDisplayCategories.length > 0 ? filteredDisplayCategories.map(cat => (
+                                            <div key={cat.id} className="flex items-center space-x-2">
+                                                <Checkbox 
+                                                    id={`cat-${cat.id}`} 
+                                                    checked={selectedCategoryIds.includes(cat.id)}
+                                                    onCheckedChange={(checked) => handleCategoryCheckboxChange(cat.id, !!checked)}
+                                                />
+                                                <Label htmlFor={`cat-${cat.id}`} className="text-xs font-normal cursor-pointer">{cat.name}</Label>
+                                            </div>
+                                         )) : <p className="text-xs text-muted-foreground">No categories found.</p>}
+                                        </div>
+                                    </ScrollArea>
+                                    {/* <Link href="#" className="text-xs text-primary hover:underline mt-1 block">View all...</Link> */}
+                                </AccordionContent>
+                            </AccordionItem>
+                            
+                            <Separator />
+
+                            <AccordionItem value="status-filter" className="border-b-0">
+                                <AccordionTrigger className="text-sm font-medium hover:no-underline py-2 px-1 rounded hover:bg-muted/50">Status</AccordionTrigger>
+                                <AccordionContent className="pt-2 space-y-2">
+                                     <div className="relative">
+                                        <Input 
+                                            placeholder="Search statuses..." 
+                                            value={statusSearchTerm}
+                                            onChange={(e) => setStatusSearchTerm(e.target.value)}
+                                            className="pl-8 text-xs h-8"
+                                        />
+                                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                    </div>
+                                    <ScrollArea className="h-[100px] pr-3">
+                                        <div className="space-y-1.5">
+                                        {filteredDisplayStatuses.map(status => (
+                                            <div key={status} className="flex items-center space-x-2">
+                                                <Checkbox 
+                                                    id={`status-${status}`}
+                                                    checked={selectedStatuses.includes(status)}
+                                                    onCheckedChange={(checked) => handleStatusCheckboxChange(status, !!checked)}
+                                                />
+                                                <Label htmlFor={`status-${status}`} className="text-xs font-normal cursor-pointer">{status}</Label>
+                                            </div>
+                                        ))}
+                                        </div>
+                                    </ScrollArea>
+                                    {/* <Link href="#" className="text-xs text-primary hover:underline mt-1 block">View all...</Link> */}
+                                </AccordionContent>
+                            </AccordionItem>
+                             {/* Add more accordion items for People, Company, Contract type here as placeholders if needed */}
+                        </Accordion>
                     </div>
-                    <DialogFooter className="pt-4">
-                      <Button type="button" variant="outline" onClick={() => setIsFilterDialogOpen(false)}>
-                        Cancel
+                    <DialogFooter className="p-4 border-t flex justify-between">
+                      <Button type="button" variant="ghost" onClick={handleClearFilters} className="text-sm">
+                        Clear All
                       </Button>
-                      <Button type="button" onClick={handleApplyFilters} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                      <Button type="button" onClick={handleApplyFilters} className="bg-primary text-primary-foreground hover:bg-primary/90 text-sm">
                         Apply Filters
                       </Button>
                     </DialogFooter>
+                     <DialogClose className="absolute right-3 top-3 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                        <X className="h-4 w-4" />
+                        <span className="sr-only">Close</span>
+                    </DialogClose>
                   </DialogContent>
                 </Dialog>
 
-                <Button variant="outline" size="sm" onClick={handleSeeAllClick}>See All</Button>
+                <Button variant="outline" size="sm" onClick={handleClearFilters}>Reset Filters</Button>
 
                 <Button className="bg-primary text-primary-foreground hover:bg-primary/90" size="sm" asChild>
                   <Link href="/admin/products/add">
