@@ -103,7 +103,7 @@ model Product {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  @@map("accessorice-app") // Maps to the 'accessorice-app' collection for products
+  @@map("Product") // Maps to the 'accessorice-app' collection for products
 }
 
 model Category {
@@ -114,5 +114,5 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("categories") // Explicitly map to "categories" collection
+  @@map("Category")
 }
