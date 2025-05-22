@@ -32,7 +32,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { PlusCircle, Edit2, Trash2, MoreHorizontal, Loader2 } from 'lucide-react';
 import type { Category } from '@/types'; 
@@ -52,7 +51,13 @@ export default function AdminCategoriesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+  
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [categoryToEdit, setCategoryToEdit] = useState<Category | null>(null);
+  const [editedCategoryName, setEditedCategoryName] = useState('');
+
 
   const { toast } = useToast();
 
@@ -91,7 +96,7 @@ export default function AdminCategoriesPage() {
 
   useEffect(() => {
     fetchCategories();
-  }, []); // Removed toast from dependencies as fetchCategories doesn't directly use it in a way that should trigger re-fetch
+  }, []);
 
   const handleAddCategory = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -127,12 +132,40 @@ export default function AdminCategoriesPage() {
     }
   };
 
-  const handleEditCategory = (categoryId: string) => {
-    const category = categories.find(c => c.id === categoryId);
-    toast({
-      title: 'Edit Category (Mock)',
-      description: `Editing category: ${category?.name || 'Unknown'}. Implement edit logic here.`,
-    });
+  const openEditDialog = (category: Category) => {
+    setCategoryToEdit(category);
+    setEditedCategoryName(category.name); // Initialize with current name
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!categoryToEdit || !editedCategoryName.trim()) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Category name cannot be empty.' });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`/api/categories/${categoryToEdit.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editedCategoryName.trim() }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || `Failed to update category. Status: ${response.status}`);
+      }
+      toast({ title: 'Category Updated!', description: `Category "${result.name}" has been updated.` });
+      setIsEditDialogOpen(false);
+      setCategoryToEdit(null);
+      fetchCategories(); 
+    } catch (error) {
+      console.error("Error updating category:", error);
+      const errorToDisplay = error instanceof Error ? error : new Error(String(error));
+      toast({ variant: 'destructive', title: 'Error Updating Category', description: errorToDisplay.message });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const confirmDeleteCategory = async () => {
@@ -161,6 +194,7 @@ export default function AdminCategoriesPage() {
       setIsSubmitting(false);
     }
   };
+
 
   const renderContent = () => {
     if (isLoading) {
@@ -204,7 +238,7 @@ export default function AdminCategoriesPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleEditCategory(category.id)}>
+                    <DropdownMenuItem onClick={() => openEditDialog(category)}>
                       <Edit2 className="mr-2 h-4 w-4" /> Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setCategoryToDelete(category)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
@@ -272,6 +306,50 @@ export default function AdminCategoriesPage() {
         </CardContent>
       </Card>
 
+      {/* Edit Category Dialog */}
+      {categoryToEdit && (
+        <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
+          setIsEditDialogOpen(isOpen);
+          if (!isOpen) setCategoryToEdit(null); // Clear categoryToEdit when dialog closes
+        }}>
+          <DialogContent className="sm:max-w-[425px]">
+            <form onSubmit={handleEditSubmit}>
+              <DialogHeader>
+                <DialogTitle>Edit Category</DialogTitle>
+                <DialogDescription>Update the name for the category "{categoryToEdit.name}".</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-category-name">New Category Name</Label>
+                  <Input
+                    id="edit-category-name"
+                    value={editedCategoryName}
+                    onChange={(e) => setEditedCategoryName(e.target.value)}
+                    placeholder="e.g., Electronics"
+                    required
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => {
+                    setIsEditDialogOpen(false);
+                    setCategoryToEdit(null);
+                  }}>Cancel</Button>
+                </DialogClose>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
+
+      {/* Delete Category Confirmation Dialog */}
       {categoryToDelete && (
         <AlertDialog open={!!categoryToDelete} onOpenChange={() => setCategoryToDelete(null)}>
           <AlertDialogContent>
