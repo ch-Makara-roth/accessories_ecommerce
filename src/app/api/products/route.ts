@@ -3,38 +3,42 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import type { Product } from '@/types';
 import type { Prisma } from '@prisma/client';
+import fs from 'fs/promises';
+import path from 'path';
+
+// Ensure Prisma client is available
+if (!prisma) {
+  console.error('API /api/products: CRITICAL - Prisma client is not initialized.');
+  // This block ideally shouldn't be reached if prisma client setup is correct in lib/prisma.ts
+}
 
 // GET handler
 export async function GET(request: NextRequest) {
   console.log('API GET /api/products: Received request.');
 
+  if (!prisma || typeof prisma.product?.findMany !== 'function') {
+      const errorMsg = 'Internal Server Error: Prisma product model is not accessible. Ensure `npx prisma generate` has been run and server restarted.';
+      console.error(`API GET /api/products: CRITICAL - ${errorMsg}`);
+      return NextResponse.json({ error: errorMsg, message: errorMsg }, { status: 500 });
+  }
+  console.log('API GET /api/products: Prisma client and prisma.product.findMany seem available.');
+  
   const { searchParams } = new URL(request.url);
   const categoryIdsParam = searchParams.get('categoryId');
   const statusesParam = searchParams.get('status');
 
-  if (!prisma) {
-    console.error('API GET /api/products: CRITICAL - Prisma client (imported as `prisma`) is undefined!');
-    return NextResponse.json({ error: 'Internal Server Error: Prisma client is not initialized. Check server logs, DATABASE_URL in .env.local, and ensure server was restarted.' }, { status: 500 });
-  }
-  if (!prisma.product || typeof prisma.product.findMany !== 'function') {
-      console.error('API GET /api/products: CRITICAL - prisma.product or prisma.product.findMany is undefined/not a function. This strongly suggests `npx prisma generate` has not been run successfully or the server needs a restart after schema changes. Check server console logs.');
-      return NextResponse.json({ error: 'Internal Server Error: Prisma product model is not accessible. Ensure `npx prisma generate` has been run and server restarted.' }, { status: 500 });
-  }
-  console.log('API GET /api/products: Prisma client and prisma.product.findMany seem available.');
-
   try {
     const whereClause: Prisma.ProductWhereInput = {};
     
-    if (categoryIdsParam) {
+    if (categoryIdsParam && categoryIdsParam !== 'all-categories') {
       const categoryIds = categoryIdsParam.split(',');
       if (categoryIds.length > 0) {
         whereClause.categoryId = { in: categoryIds };
       }
     }
 
-    if (statusesParam) {
+    if (statusesParam && statusesParam !== 'all-statuses') {
       const statuses = statusesParam.split(',');
       if (statuses.length > 0) {
         whereClause.status = { in: statuses };
@@ -49,7 +53,7 @@ export async function GET(request: NextRequest) {
       include: { category: true },
     });
 
-    const sanitizedProducts: Product[] = productsFromDB.map(productDoc => ({
+    const sanitizedProducts = productsFromDB.map(productDoc => ({
       id: productDoc.id,
       _id: productDoc.id,
       name: productDoc.name || 'Unknown Product',
@@ -58,7 +62,7 @@ export async function GET(request: NextRequest) {
       rating: typeof productDoc.rating === 'number' ? productDoc.rating : 0,
       reviewCount: typeof productDoc.reviewCount === 'number' ? productDoc.reviewCount : 0,
       description: productDoc.description || '',
-      image: productDoc.image || 'https://placehold.co/600x400.png',
+      image: productDoc.image || '/placehold.co/600x400.png', // Default if no image
       category: productDoc.category ? {
         id: productDoc.category.id,
         _id: productDoc.category.id,
@@ -85,7 +89,8 @@ export async function GET(request: NextRequest) {
     let errorDetails = e.message;
     console.error('API GET /api/products Error (Prisma):', e);
 
-    if (e.name === 'MongoServerSelectionError' || e.name === 'MongoNetworkError' || e.message?.includes('ECONNREFUSED') || e.message?.includes('tlsv1 alert internal error')) {
+    // ... (existing error handling for GET)
+     if (e.name === 'MongoServerSelectionError' || e.name === 'MongoNetworkError' || e.message?.includes('ECONNREFUSED') || e.message?.includes('tlsv1 alert internal error')) {
         errorMessage = `MongoDB Connection Error: ${e.message}. Please verify MONGODB_URI and DATABASE_URL in .env.local. Ensure MongoDB Atlas IP Access List includes your current IP and the server is restarted. Also, check server console logs.`;
     } else if (e.message?.includes("Environment variable not found: DATABASE_URL")) {
         errorMessage = "CRITICAL: DATABASE_URL environment variable is not defined. Please set it in .env.local and restart the server.";
@@ -111,7 +116,7 @@ export async function POST(request: NextRequest) {
   }
    if (!prisma.product || typeof prisma.product.create !== 'function') {
     const errorMsg = 'Internal Server Error: Prisma product model not accessible. Ensure `npx prisma generate` has been run and server restarted.';
-    console.error(`API POST /api/products: CRITICAL - prisma.product or prisma.product.create is undefined/not a function. This strongly suggests \`npx prisma generate\` has not been run successfully or the server needs a restart after schema changes. Prisma object: ${JSON.stringify(prisma, Object.getOwnPropertyNames(prisma))}`);
+    console.error(`API POST /api/products: CRITICAL - ${errorMsg}. Prisma object: ${JSON.stringify(prisma, Object.getOwnPropertyNames(prisma))}`);
     return NextResponse.json({ error: errorMsg, message: errorMsg }, { status: 500 });
   }
   console.log('API POST /api/products: Prisma client and prisma.product.create seem available.');
@@ -130,12 +135,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required product fields (name, price, description)' }, { status: 400 });
     }
 
-    let imageUrl = `https://placehold.co/600x400.png?text=${encodeURIComponent(String(productFields.name).substring(0,20)) || 'No+Image'}`;
+    let imageUrl = `/placehold.co/600x400.png?text=${encodeURIComponent(String(productFields.name).substring(0,20)) || 'No+Image'}`; // Default
     const imageFile = formData.get('imageFile') as File | null;
 
     if (imageFile) {
-      console.log(`API POST /api/products: SIMULATING UPLOAD - Received image file: ${imageFile.name}, size: ${imageFile.size}, type: ${imageFile.type}. Using placeholder URL.`);
-      imageUrl = `https://placehold.co/600x400.png?text=Uploaded+${encodeURIComponent(imageFile.name.substring(0,15))}`;
+      // --- DEVELOPMENT ONLY: Local File Storage ---
+      // NOT SUITABLE FOR PRODUCTION ON SERVERLESS PLATFORMS (e.g., Vercel)
+      console.warn("API POST /api/products: USING LOCAL FILE STORAGE FOR IMAGE. THIS IS FOR DEVELOPMENT ONLY AND NOT PRODUCTION-READY.");
+      
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'products');
+      await fs.mkdir(uploadsDir, { recursive: true }); // Ensure directory exists
+
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const fileExtension = path.extname(imageFile.name) || '.jpg'; // Default extension
+      const uniqueFilename = `${path.basename(imageFile.name, fileExtension)}-${uniqueSuffix}${fileExtension}`;
+      const filePath = path.join(uploadsDir, uniqueFilename);
+
+      const fileBuffer = Buffer.from(await imageFile.arrayBuffer());
+      await fs.writeFile(filePath, fileBuffer);
+
+      imageUrl = `/uploads/products/${uniqueFilename}`; // Relative path for serving from public
+      console.log(`API POST /api/products: Image saved locally to ${filePath}. Public URL: ${imageUrl}`);
+      // --- END DEVELOPMENT ONLY ---
     } else {
         console.log("API POST /api/products: No image file provided for product:", productFields.name);
     }
@@ -160,8 +181,8 @@ export async function POST(request: NextRequest) {
       price: parsedPrice,
       description: String(productFields.description),
       image: imageUrl,
-      originalPrice: parsedOriginalPrice,
-      stock: parsedStock,
+      originalPrice: parsedOriginalPrice === undefined ? null : parsedOriginalPrice,
+      stock: parsedStock === undefined ? null : parsedStock,
       status: String(productFields.status || 'Draft'),
       type: productFields.type ? String(productFields.type) : undefined,
       color: productFields.color ? String(productFields.color) : undefined,
@@ -185,7 +206,7 @@ export async function POST(request: NextRequest) {
             console.warn(`API POST /api/products: Category with ID "${categoryId}" not found for product "${dataToCreate.name}". Product will be created without category linkage.`);
           }
         } catch (catError: any) {
-           if (catError.code === 'P2023' && catError.message?.includes('Malformed ObjectID')) { // Prisma error for malformed ID
+           if (catError.code === 'P2023' && catError.message?.includes('Malformed ObjectID')) { 
              console.warn(`API POST /api/products: Provided category ID "${categoryId}" for product "${dataToCreate.name}" is not a valid ObjectId format according to Prisma. Product will be created without category linkage.`);
            } else {
             console.error(`API POST /api/products: Error finding category with ID "${categoryId}" for product "${dataToCreate.name}":`, catError.message);
@@ -194,7 +215,6 @@ export async function POST(request: NextRequest) {
     } else if (categoryId && categoryId.trim() !== '') {
         console.warn(`API POST /api/products: Provided category ID "${categoryId}" for product "${dataToCreate.name}" is not a valid ObjectId format. Product will be created without category linkage.`);
     }
-
 
     dataToCreate.dataAiHint = `${categoryNameForHint} ${dataToCreate.name || 'item'}`.substring(0, 50).toLowerCase();
 
@@ -210,7 +230,7 @@ export async function POST(request: NextRequest) {
     let errorMessage = 'An unexpected error occurred while adding the product.';
     let errorDetails = e.message || String(e);
 
-    if (e.code === 'P2002' && e.meta?.target) { // Unique constraint failed
+    if (e.code === 'P2002' && e.meta?.target) { 
         errorMessage = `A product with this ${Array.isArray(e.meta.target) ? e.meta.target.join(', ') : e.meta.target} already exists.`;
         errorDetails = `The field(s) '${Array.isArray(e.meta.target) ? e.meta.target.join(', ') : e.meta.target}' must be unique.`;
     } else if (e.code === 'P2023' && e.message?.includes('Malformed ObjectID')) {
@@ -218,8 +238,8 @@ export async function POST(request: NextRequest) {
         errorDetails = e.message;
     } else if (e.code === 'P2025' ) {
         errorMessage = "Record not found. The category ID you tried to connect might not exist."
-    } else if (e.message && e.message.includes("Argument `category`: Invalid value provided. Expected String or Null, provided Object.")) {
-      errorMessage = "Prisma schema mismatch for 'category' field during product creation. Please ensure `npx prisma generate` has been run successfully after defining the Product-Category relation in your `schema.prisma` and that your server has been restarted. This is a critical step for Prisma to understand your data model correctly."
+    } else if (e.message && (e.message.includes("Argument `category`: Invalid value provided. Expected String or Null, provided Object.") || e.message.includes("Expected `ProductCreateInput` or `ProductUncheckedCreateInput`"))) {
+      errorMessage = "Prisma schema mismatch or outdated client. Ensure `npx prisma generate` has been run successfully after defining the Product-Category relation in your `schema.prisma` and that your server has been restarted. This is a critical step for Prisma to understand your data model correctly."
       errorDetails = e.message;
     } else if (e.message?.includes("Cannot read properties of undefined (reading 'create')") || (e.message?.includes("TypeError") && e.message?.includes(".create is not a function"))) {
       errorMessage = 'Internal Server Error: Prisma product model is not accessible (cannot call .create). Ensure `npx prisma generate` has been run and server restarted.';
@@ -232,4 +252,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to add product', details: errorDetails, message: errorMessage }, { status: 500 });
   }
 }
+    
+
     

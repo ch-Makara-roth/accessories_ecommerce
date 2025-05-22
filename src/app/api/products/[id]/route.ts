@@ -4,6 +4,8 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
+import fs from 'fs/promises';
+import path from 'path';
 
 // GET a single product by ID
 export async function GET(
@@ -29,18 +31,18 @@ export async function GET(
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
-    // Map Prisma _id to id for consistency if needed, though Prisma usually handles this
     const sanitizedProduct = {
         ...product,
-        id: product.id, // Prisma client often returns id as string
-        _id: product.id, // For explicit MongoDB _id if ever needed
-        price: Number(product.price), // Ensure price is number
+        id: product.id, 
+        _id: product.id,
+        price: Number(product.price),
         originalPrice: product.originalPrice ? Number(product.originalPrice) : undefined,
         stock: product.stock ?? 0,
         rating: product.rating ?? 0,
         reviewCount: product.reviewCount ?? 0,
         tags: product.tags ?? [],
         status: product.status ?? 'Draft',
+        image: product.image || '/placehold.co/600x400.png', // Default if no image
         dataAiHint: product.dataAiHint || `${product.category?.name || 'product'} ${product.name || 'item'}`.substring(0,50).toLowerCase(),
     };
 
@@ -85,29 +87,63 @@ export async function PUT(
       return NextResponse.json({ error: 'Missing required product fields (name, price, description) for update' }, { status: 400 });
     }
 
-    const imageFile = formData.get('imageFile') as File | null;
     let imageUrl: string | undefined = undefined;
+    const imageFile = formData.get('imageFile') as File | null;
 
     if (imageFile) {
-      console.log(`API PUT /api/products/${id}: SIMULATING UPLOAD - Received image file: ${imageFile.name}, size: ${imageFile.size}, type: ${imageFile.type}. Using placeholder URL.`);
-      imageUrl = `https://placehold.co/600x400.png?text=Updated+${encodeURIComponent(imageFile.name.substring(0,15))}`;
+        // --- DEVELOPMENT ONLY: Local File Storage ---
+        console.warn(`API PUT /api/products/${id}: USING LOCAL FILE STORAGE FOR IMAGE UPDATE. THIS IS FOR DEVELOPMENT ONLY.`);
+        const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'products');
+        await fs.mkdir(uploadsDir, { recursive: true });
+
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const fileExtension = path.extname(imageFile.name) || '.jpg';
+        const uniqueFilename = `${path.basename(imageFile.name, fileExtension)}-${uniqueSuffix}${fileExtension}`;
+        const filePath = path.join(uploadsDir, uniqueFilename);
+        
+        const fileBuffer = Buffer.from(await imageFile.arrayBuffer());
+        await fs.writeFile(filePath, fileBuffer);
+
+        imageUrl = `/uploads/products/${uniqueFilename}`;
+        console.log(`API PUT /api/products/${id}: New image saved to ${filePath}. Public URL: ${imageUrl}`);
+        // TODO: Optionally delete old image file if replacing
+        // --- END DEVELOPMENT ONLY ---
     }
 
-    const parsedPrice = parseFloat(String(productFields.price));
-    const parsedOriginalPrice = productFields.originalPrice ? parseFloat(String(productFields.originalPrice)) : undefined;
-    const parsedStock = productFields.stock ? parseInt(String(productFields.stock), 10) : undefined;
 
+    const parsedPrice = parseFloat(String(productFields.price));
     if (isNaN(parsedPrice)) {
       return NextResponse.json({ error: 'Price must be a valid number for update.' }, { status: 400 });
+    }
+
+    let parsedOriginalPrice: number | null = null;
+    if (productFields.originalPrice !== undefined) {
+      if (String(productFields.originalPrice).trim() === '') {
+        parsedOriginalPrice = null;
+      } else {
+        parsedOriginalPrice = parseFloat(String(productFields.originalPrice));
+        if (isNaN(parsedOriginalPrice)) {
+          return NextResponse.json({ error: 'Original Price must be a valid number or empty.' }, { status: 400 });
+        }
+      }
+    }
+    
+    let parsedStock: number | null = null;
+     if (productFields.stock !== undefined) {
+      if (String(productFields.stock).trim() === '') {
+        parsedStock = null;
+      } else {
+        parsedStock = parseInt(String(productFields.stock), 10);
+        if (isNaN(parsedStock)) {
+          return NextResponse.json({ error: 'Stock Quantity must be a valid integer or empty.' }, { status: 400 });
+        }
+      }
     }
     
     const dataToUpdate: Prisma.ProductUpdateInput = {
       name: String(productFields.name),
       price: parsedPrice,
       description: String(productFields.description),
-      ...(imageUrl && { image: imageUrl }), // Only update image if a new one is provided
-      originalPrice: parsedOriginalPrice,
-      stock: parsedStock,
       status: String(productFields.status || 'Draft'),
       type: productFields.type ? String(productFields.type) : undefined,
       color: productFields.color ? String(productFields.color) : undefined,
@@ -116,31 +152,38 @@ export async function PUT(
       tags: typeof productFields.tags === 'string' ? productFields.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
     };
 
-    let categoryNameForHint = productFields.name || 'item'; 
-    if (productFields.category && String(productFields.category).trim() !== '') {
-        const categoryId = String(productFields.category);
-        if (!/^[0-9a-fA-F]{24}$/.test(categoryId)) {
-            console.warn(`API PUT /api/products/${id}: Provided category ID "${categoryId}" is not a valid ObjectId format. Category will not be updated.`);
-        } else {
-            const categoryExists = await prisma.category.findUnique({ where: { id: categoryId } });
-            if (categoryExists) {
-                dataToUpdate.category = { connect: { id: categoryId } };
-                categoryNameForHint = categoryExists.name;
-            } else {
-                console.warn(`API PUT /api/products/${id}: Category with ID "${categoryId}" not found. Category will not be updated.`);
-                // To disconnect a category if an invalid ID is sent, or if you want to allow unsetting category:
-                // dataToUpdate.category = { disconnect: true }; 
-                // dataToUpdate.categoryId = null; // Explicitly set foreign key to null
-            }
-        }
-    } else if (productFields.category === '') { // Handle explicitly unsetting the category
-        dataToUpdate.category = { disconnect: true };
-        dataToUpdate.categoryId = null;
+    if (imageUrl !== undefined) {
+      dataToUpdate.image = imageUrl;
+    }
+    if (productFields.originalPrice !== undefined) {
+      dataToUpdate.originalPrice = parsedOriginalPrice;
+    }
+    if (productFields.stock !== undefined) {
+      dataToUpdate.stock = parsedStock;
     }
 
 
-    dataToUpdate.dataAiHint = `${categoryNameForHint} ${dataToUpdate.name || 'item'}`.substring(0,50).toLowerCase();
+    let categoryNameForHint = productFields.name || 'item'; 
+    const categoryId = productFields.category ? String(productFields.category) : null;
 
+    if (categoryId && categoryId.trim() !== '' && /^[0-9a-fA-F]{24}$/.test(categoryId)) {
+      const categoryExists = await prisma.category.findUnique({ where: { id: categoryId } });
+      if (categoryExists) {
+        dataToUpdate.category = { connect: { id: categoryId } };
+        categoryNameForHint = categoryExists.name;
+      } else {
+        console.warn(`API PUT /api/products/${id}: Category with ID "${categoryId}" not found. Category link will not be updated.`);
+        dataToUpdate.category = { disconnect: true }; // Or set categoryId to null
+        dataToUpdate.categoryId = null;
+      }
+    } else if (categoryId === '' || categoryId === null) { // Explicitly unsetting category
+        dataToUpdate.category = { disconnect: true };
+        dataToUpdate.categoryId = null;
+    } else if (categoryId) {
+        console.warn(`API PUT /api/products/${id}: Provided category ID "${categoryId}" is not valid. Category link will not be updated.`);
+    }
+
+    dataToUpdate.dataAiHint = `${categoryNameForHint} ${dataToUpdate.name || 'item'}`.substring(0,50).toLowerCase();
 
     const updatedProduct = await prisma.product.update({
       where: { id },
@@ -155,7 +198,7 @@ export async function PUT(
     let errorMessage = 'Failed to update product.';
     let errorDetails = e.message || String(e);
 
-    if (e.code === 'P2025') { // Record to update not found
+    if (e.code === 'P2025') { 
       errorMessage = `Product with ID ${id} not found.`;
       return NextResponse.json({ error: errorMessage, details: e.message }, { status: 404 });
     }
@@ -186,9 +229,18 @@ export async function DELETE(
   }
 
   try {
+    // Optionally, retrieve product to get image path for deletion
+    // const product = await prisma.product.findUnique({ where: { id } });
+
     await prisma.product.delete({
       where: { id },
     });
+
+    // TODO: If product.image pointed to a locally stored file in public/uploads, delete it here.
+    // For example: if (product?.image?.startsWith('/uploads/')) {
+    //   await fs.unlink(path.join(process.cwd(), 'public', product.image));
+    // }
+
     console.log(`API DELETE /api/products/${id}: Product deleted successfully.`);
     return NextResponse.json({ message: 'Product deleted successfully' }, { status: 200 });
   } catch (e: any) {
@@ -199,3 +251,6 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete product', details: e.message || String(e) }, { status: 500 });
   }
 }
+
+
+    
