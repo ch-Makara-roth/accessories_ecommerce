@@ -8,10 +8,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
-import { useState, type FormEvent, type ChangeEvent } from 'react';
+import { useState, type FormEvent, type ChangeEvent, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import Image from 'next/image'; // Added for consistent styling if needed, though native <img> is fine for preview
 
 export default function AddProductPage() {
   const [name, setName] = useState('');
@@ -21,7 +22,8 @@ export default function AddProductPage() {
   const [originalPrice, setOriginalPrice] = useState('');
   const [stock, setStock] = useState('');
   const [status, setStatus] = useState('Draft');
-  const [imageFile, setImageFile] = useState<File | null>(null); // Changed from image URL string to File
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null); // For image preview
   const [type, setType] = useState('');
   const [color, setColor] = useState('');
   const [material, setMaterial] = useState('');
@@ -34,11 +36,26 @@ export default function AddProductPage() {
 
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
-      setImageFile(event.target.files[0]);
+      const file = event.target.files[0];
+      setImageFile(file);
+      setImagePreviewUrl(URL.createObjectURL(file));
     } else {
       setImageFile(null);
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl); // Clean up old preview
+      }
+      setImagePreviewUrl(null);
     }
   };
+
+  // Clean up object URL to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    };
+  }, [imagePreviewUrl]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -56,12 +73,11 @@ export default function AddProductPage() {
     if (color) formData.append('color', color);
     if (material) formData.append('material', material);
     if (offer) formData.append('offer', offer);
-    formData.append('tags', tags); // Will be sent as comma-separated string
+    formData.append('tags', tags);
 
     if (imageFile) {
-      formData.append('imageFile', imageFile); // Changed key to 'imageFile'
+      formData.append('imageFile', imageFile);
     } else {
-      // If image is required and no file is selected, you might want to show an error
       toast({
         variant: 'destructive',
         title: 'Image Required',
@@ -74,7 +90,6 @@ export default function AddProductPage() {
     try {
       const response = await fetch('/api/products', {
         method: 'POST',
-        // 'Content-Type' header is automatically set by the browser when using FormData
         body: formData,
       });
 
@@ -187,9 +202,20 @@ export default function AddProductPage() {
                   type="file" 
                   accept="image/*" 
                   onChange={handleImageChange} 
-                  required // Making file input required
+                  required
                 />
-                {imageFile && <p className="text-sm text-muted-foreground mt-1">Selected: {imageFile.name}</p>}
+                {imageFile && <p className="text-xs text-muted-foreground mt-1">Selected: {imageFile.name}</p>}
+                {imagePreviewUrl && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium mb-2">Image Preview:</p>
+                    {/* Using native <img> for direct object URL preview. Next/Image is better for optimized images from a server. */}
+                    <img 
+                        src={imagePreviewUrl} 
+                        alt="Image Preview" 
+                        className="max-w-xs max-h-48 rounded-md border object-contain" 
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
