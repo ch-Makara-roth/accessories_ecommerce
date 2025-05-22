@@ -74,7 +74,7 @@ export default function AdminProductsPage() {
           } else if (errorResponseText) {
              serverErrorMsg += ` (Raw server response snippet: ${errorResponseText.substring(0,150)}...)`;
           }
-          console.error("Client-side: Failed to parse API error response as JSON. Status:", response.status, parseError);
+          console.error("Client-side: Failed to parse API error response as JSON. Status:", response.status, "Error:", parseError);
           console.error("Client-side: Original API error response text snippet:", errorResponseText.substring(0, 500));
         }
         throw new Error(serverErrorMsg);
@@ -149,7 +149,7 @@ export default function AdminProductsPage() {
     let categoryToLog = 'Any';
     if (filterCategory && filterCategory !== 'all') {
         const selectedCategory = availableCategories.find(cat => cat.id === filterCategory);
-        categoryToLog = selectedCategory ? selectedCategory.name : filterCategory; // Fallback to ID if name not found
+        categoryToLog = selectedCategory ? selectedCategory.name : filterCategory; 
     }
     
     const statusToLog = filterStatus === 'all-statuses' || filterStatus === undefined ? 'Any' : filterStatus;
@@ -160,7 +160,6 @@ export default function AdminProductsPage() {
     });
     console.log('Applying filters:', { category: filterCategory, status: filterStatus });
     // Here you would typically re-fetch products with filter query parameters
-    // For now, it's just logging and showing a toast.
   };
   
   const confirmDeleteProduct = async () => {
@@ -245,7 +244,7 @@ export default function AdminProductsPage() {
                 />
                 {product.name}
               </TableCell>
-              <TableCell>{typeof product.category === 'object' && product.category !== null ? product.category.name : product.category || 'N/A'}</TableCell>
+              <TableCell>{product.category?.name || 'N/A'}</TableCell>
               <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
               <TableCell className="text-right">{product.stock || 0}</TableCell>
               <TableCell>
