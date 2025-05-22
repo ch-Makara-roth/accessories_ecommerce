@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import { useState, type FormEvent, useEffect } from 'react';
+import { useState, type FormEvent, useEffect, Suspense } from 'react'; // Added Suspense
 import { Separator } from '@/components/ui/separator';
 import { ShieldCheck, Chrome, Facebook, Mail, KeyRound, Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -15,7 +15,18 @@ import { useToast } from '@/hooks/use-toast';
 
 type AuthStep = 'login' | 'signup' | 'otpVerification';
 
-export default function AuthPage() {
+function AuthPageFallback() {
+  return (
+    <div className="flex flex-col justify-center items-center py-12 min-h-[calc(100vh-var(--header-height,0px)-var(--footer-height,0px))] gap-10">
+      <div className="text-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+        <p className="text-muted-foreground">Loading authentication options...</p>
+      </div>
+    </div>
+  );
+}
+
+function AuthPageContent() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const { toast } = useToast();
@@ -46,9 +57,7 @@ export default function AuthPage() {
       if (errorParam === 'CredentialsSignin') {
         description = 'Invalid email or password.';
       } else if (errorParam === 'Email not verified. Please check your inbox for a verification code or request a new one.') {
-        // This custom error message is thrown from authorize
         description = errorParam;
-        // Extract email from previous attempt if possible or prompt
         const callbackUrl = searchParams.get('callbackUrl');
         const attemptEmail = new URLSearchParams(callbackUrl?.split('?')[1] || '').get('email') || loginEmail;
         if (attemptEmail) {
@@ -61,10 +70,9 @@ export default function AuthPage() {
         title: 'Login Failed',
         description: description,
       });
-      // Clear error from URL
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('error');
-      newUrl.searchParams.delete('callbackUrl'); // Also remove callbackUrl if it's there
+      newUrl.searchParams.delete('callbackUrl');
       router.replace(newUrl.pathname + newUrl.search, { scroll: false });
     }
   }, [searchParams, toast, router, loginEmail]);
@@ -72,10 +80,10 @@ export default function AuthPage() {
 
   if (status === 'authenticated') {
     router?.push('/account');
-    return <div className="text-center py-10">Loading account details...</div>;
+    return <AuthPageFallback />; // Show fallback while redirecting
   }
-  if (status === 'loading' && !searchParams.get('error')) { // Only show main loading if not handling an error
-    return <div className="text-center py-10">Loading session...</div>;
+  if (status === 'loading' && !searchParams.get('error')) {
+    return <AuthPageFallback />;
   }
 
   const handleAdminLogin = () => {
@@ -89,12 +97,10 @@ export default function AuthPage() {
       redirect: false,
       email: loginEmail,
       password: loginPassword,
-      callbackUrl: `/auth?email=${encodeURIComponent(loginEmail)}` // Pass email for error handling
+      callbackUrl: `/auth?email=${encodeURIComponent(loginEmail)}`
     });
 
     if (result?.error) {
-       // Error handling is now primarily done in useEffect via searchParams
-       // Specific "Email not verified" error will trigger OTP step via useEffect
       if (result.error !== 'Email not verified. Please check your inbox for a verification code or request a new one.') {
         toast({
           variant: 'destructive',
@@ -130,7 +136,6 @@ export default function AuthPage() {
       toast({ title: 'Registration Pending Verification', description: data.message });
       setOtpTargetEmail(data.emailForOtp);
       setAuthStep('otpVerification');
-      // Clear signup form fields
       setSignupFirstName(''); setSignupLastName(''); setSignupEmail(''); setSignupPassword('');
     } catch (error) {
       toast({
@@ -157,7 +162,7 @@ export default function AuthPage() {
       }
       toast({ title: 'Email Verified!', description: 'Your email has been verified. Please log in.' });
       setAuthStep('login');
-      setLoginEmail(otpTargetEmail); // Pre-fill login email
+      setLoginEmail(otpTargetEmail);
       setOtpCode('');
       setOtpTargetEmail('');
     } catch (error) {
@@ -354,5 +359,14 @@ export default function AuthPage() {
         </Card>
         </div>
     </div>
+  );
+}
+
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<AuthPageFallback />}>
+      <AuthPageContent />
+    </Suspense>
   );
 }
