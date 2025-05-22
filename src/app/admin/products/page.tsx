@@ -49,8 +49,8 @@ export default function AdminProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const [filterCategory, setFilterCategory] = useState<string | undefined>(undefined); // Changed initial state
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string | undefined>(undefined);
+  const [filterStatus, setFilterStatus] = useState<string | undefined>(undefined); // Changed initial state
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -137,21 +137,24 @@ export default function AdminProductsPage() {
 
   const handleSeeAllClick = () => {
     toast({
-      title: 'Filters Cleared (Mock)',
+      title: 'Filters Cleared',
       description: 'Displaying all products.',
     });
-    setFilterCategory(undefined); // Clear category filter
-    setFilterStatus('');
+    setFilterCategory(undefined);
+    setFilterStatus(undefined);
     fetchProducts(); 
   };
 
   const handleApplyFilters = () => {
     const categoryToLog = filterCategory === 'all' || filterCategory === undefined ? 'Any' : filterCategory;
+    const statusToLog = filterStatus === 'all-statuses' || filterStatus === undefined ? 'Any' : filterStatus;
     toast({
         title: 'Filters Applied (Mock)',
-        description: `Category: ${categoryToLog}, Status: ${filterStatus || 'Any'}`,
+        description: `Category: ${categoryToLog}, Status: ${statusToLog}`,
     });
     console.log('Applying filters:', { category: filterCategory, status: filterStatus });
+    // Here you would typically re-fetch products with filter query parameters
+    // For now, it's just logging and showing a toast.
   };
   
   const confirmDeleteProduct = async () => {
@@ -311,7 +314,7 @@ export default function AdminProductsPage() {
                                <SelectItem value="loading" disabled>Loading categories...</SelectItem>
                             ) : (
                               <>
-                                <SelectItem value="all">All Categories</SelectItem> {/* Changed value */}
+                                <SelectItem value="all">All Categories</SelectItem>
                                 {availableCategories.length > 0 ? availableCategories.map((cat) => (
                                   <SelectItem key={cat.id} value={cat.id}>
                                     {cat.name}
@@ -331,7 +334,7 @@ export default function AdminProductsPage() {
                             <SelectValue placeholder="Select status" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">All Statuses</SelectItem>
+                            <SelectItem value="all-statuses">All Statuses</SelectItem> {/* Changed value */}
                             <SelectItem value="Active">Active</SelectItem>
                             <SelectItem value="Draft">Draft</SelectItem>
                             <SelectItem value="Archived">Archived</SelectItem>
