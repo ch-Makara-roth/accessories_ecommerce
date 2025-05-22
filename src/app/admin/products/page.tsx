@@ -28,12 +28,20 @@ import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import type { Product } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // State for filter dialog
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -45,17 +53,14 @@ export default function AdminProductsPage() {
           let errorResponseText = await response.text();
           let serverErrorMsg = `Server responded with ${response.status}: ${response.statusText || ''}`;
           try {
-            // Try to parse as JSON, but if it fails, it means the server sent something else (e.g., HTML)
             const errorJson = JSON.parse(errorResponseText);
             serverErrorMsg = errorJson.error || errorJson.details || serverErrorMsg;
           } catch (parseError) {
-            // If JSON parsing fails, check if it's HTML (likely a server config error)
             if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
               serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This often indicates a server-side configuration issue (e.g., MONGODB_URI in .env.local is missing/incorrect, or an unhandled error in the API route). Please check your server console logs for more details.`;
             } else if (errorResponseText) {
                serverErrorMsg += ` (Raw server response snippet: ${errorResponseText.substring(0,150)}...)`;
             }
-            // Client-side: Log the parse error and the raw response for debugging
             console.error("Client-side: Failed to parse API error response as JSON. This usually means the server sent HTML instead of JSON. Status:", response.status, "Parse Error:", parseError);
             console.error("Client-side: Original API error response text snippet:", errorResponseText.substring(0, 500));
           }
@@ -71,6 +76,7 @@ export default function AdminProductsPage() {
           variant: "destructive",
           title: "Error fetching products",
           description: errorMessage,
+          duration: 7000,
         });
       } finally {
         setLoading(false);
@@ -80,7 +86,21 @@ export default function AdminProductsPage() {
   }, [toast]);
 
   const handleSeeAllClick = () => {
+    toast({
+      title: 'Filters Cleared (Mock)',
+      description: 'Displaying all products.',
+    });
+    // In a real app, you would clear filter states and re-fetch products here.
     console.log('See All button clicked. Implement navigation or filter clearing logic here.');
+  };
+
+  const handleApplyFilters = () => {
+    toast({
+        title: 'Filters Applied (Mock)',
+        description: `Category: ${filterCategory || 'Any'}, Status: ${filterStatus || 'Any'}`,
+    });
+    console.log('Applying filters:', { category: filterCategory, status: filterStatus });
+    // In a real app, you would re-fetch products with these filter parameters.
   };
 
   const renderContent = () => {
@@ -95,9 +115,9 @@ export default function AdminProductsPage() {
 
     if (error) {
       return (
-        <div className="text-center py-10">
-          <p className="text-destructive font-semibold">Error loading products:</p>
-          <p className="text-muted-foreground mb-4">{error}</p>
+        <div className="text-center py-10 px-4">
+          <p className="text-destructive font-semibold mb-2">Error loading products:</p>
+          <p className="text-muted-foreground mb-4 text-sm break-words">{error}</p>
           <Button onClick={() => window.location.reload()} className="mt-4">Try Again</Button>
         </div>
       );
@@ -200,13 +220,38 @@ export default function AdminProductsPage() {
                     <DialogHeader>
                       <DialogTitle>Filter Products</DialogTitle>
                       <DialogDescription>
-                        Select your filter criteria below. (Filtering functionality not yet implemented.)
+                        Select your filter criteria below.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                      <p className="text-sm text-muted-foreground">
-                        Placeholder for filter options (e.g., by category, price range, status).
-                      </p>
+                      <div className="space-y-2">
+                        <Label htmlFor="filter-category">Category</Label>
+                        <Select value={filterCategory} onValueChange={setFilterCategory}>
+                          <SelectTrigger id="filter-category">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="electronics">Electronics</SelectItem>
+                            <SelectItem value="apparel">Apparel</SelectItem>
+                            <SelectItem value="headphones">Headphones</SelectItem>
+                            <SelectItem value="accessories">Accessories</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="filter-status">Status</Label>
+                         <Select value={filterStatus} onValueChange={setFilterStatus}>
+                          <SelectTrigger id="filter-status">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Active">Active</SelectItem>
+                            <SelectItem value="Draft">Draft</SelectItem>
+                            <SelectItem value="Archived">Archived</SelectItem>
+                            <SelectItem value="Scheduled">Scheduled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                     <DialogFooter>
                       <DialogClose asChild>
@@ -214,7 +259,9 @@ export default function AdminProductsPage() {
                           Cancel
                         </Button>
                       </DialogClose>
-                      <Button type="button">Apply Filters</Button>
+                      <DialogClose asChild>
+                        <Button type="button" onClick={handleApplyFilters}>Apply Filters</Button>
+                      </DialogClose>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
@@ -245,3 +292,4 @@ export default function AdminProductsPage() {
     </div>
   );
 }
+
