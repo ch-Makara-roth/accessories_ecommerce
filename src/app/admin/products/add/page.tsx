@@ -11,8 +11,8 @@ import Link from 'next/link';
 import { useState, type FormEvent, type ChangeEvent, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
-import Image from 'next/image'; // Added for consistent styling if needed, though native <img> is fine for preview
+import { Loader2, UploadCloud } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 
 export default function AddProductPage() {
   const [name, setName] = useState('');
@@ -23,7 +23,7 @@ export default function AddProductPage() {
   const [stock, setStock] = useState('');
   const [status, setStatus] = useState('Draft');
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null); // For image preview
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [type, setType] = useState('');
   const [color, setColor] = useState('');
   const [material, setMaterial] = useState('');
@@ -42,13 +42,12 @@ export default function AddProductPage() {
     } else {
       setImageFile(null);
       if (imagePreviewUrl) {
-        URL.revokeObjectURL(imagePreviewUrl); // Clean up old preview
+        URL.revokeObjectURL(imagePreviewUrl);
       }
       setImagePreviewUrl(null);
     }
   };
 
-  // Clean up object URL to prevent memory leaks
   useEffect(() => {
     return () => {
       if (imagePreviewUrl) {
@@ -101,9 +100,9 @@ export default function AddProductPage() {
           errorResult = JSON.parse(errorResponseText);
           serverErrorMsg = errorResult.error || errorResult.details || serverErrorMsg;
         } catch (e) {
-          if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
+           if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
              serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This strongly suggests a server-side configuration issue. Please: 1. Verify MONGODB_URI in your .env.local file is correct AND includes your database name. 2. Restart your Next.js server. 3. Check server console logs for more details.`;
-          } else if (errorResponseText) {
+           } else if (errorResponseText) {
             serverErrorMsg += ` (Raw server response snippet: ${errorResponseText.substring(0,200)}...)`;
           }
           console.error("Client-side: Failed to parse API POST error response as JSON. Status:", response.status, "Response text:", errorResponseText.substring(0,500));
@@ -142,118 +141,159 @@ export default function AddProductPage() {
           <Link href="/admin/products">Back to Product List</Link>
         </Button>
       </div>
-      <Card className="shadow-md">
-        <CardHeader>
-          <CardTitle>Product Information</CardTitle>
-          <CardDescription>Fill in the details for the new product.</CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="productName">Product Name *</Label>
-                <Input id="productName" placeholder="e.g., Wireless Headphones" value={name} onChange={(e) => setName(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="productCategory">Category *</Label>
-                <Input id="productCategory" placeholder="e.g., Electronics" value={category} onChange={(e) => setCategory(e.target.value)} required />
+      
+      <form onSubmit={handleSubmit}>
+        <Card className="shadow-md">
+          <CardHeader>
+            <CardTitle>Product Details</CardTitle>
+            <CardDescription>Fill in all the necessary information for the new product.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-8">
+            {/* Section: Basic Information */}
+            <div>
+              <h3 className="text-lg font-medium text-foreground mb-4">Basic Information</h3>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="productName">Product Name *</Label>
+                  <Input id="productName" placeholder="e.g., Wireless Headphones" value={name} onChange={(e) => setName(e.target.value)} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="productCategory">Category *</Label>
+                  <Input id="productCategory" placeholder="e.g., Electronics, Apparel" value={category} onChange={(e) => setCategory(e.target.value)} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="productDescription">Description *</Label>
+                  <Textarea id="productDescription" placeholder="Detailed description of the product..." value={description} onChange={(e) => setDescription(e.target.value)} required rows={4} />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="productDescription">Description *</Label>
-              <Textarea id="productDescription" placeholder="Describe the product..." value={description} onChange={(e) => setDescription(e.target.value)} required />
+            <Separator />
+
+            {/* Section: Pricing & Stock */}
+            <div>
+              <h3 className="text-lg font-medium text-foreground mb-4">Pricing & Stock</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="productPrice">Price ($) *</Label>
+                  <Input id="productPrice" type="number" step="0.01" placeholder="e.g., 99.99" value={price} onChange={(e) => setPrice(e.target.value)} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="productOriginalPrice">Original Price ($) (Optional)</Label>
+                  <Input id="productOriginalPrice" type="number" step="0.01" placeholder="e.g., 129.99" value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="productStock">Stock Quantity *</Label>
+                  <Input id="productStock" type="number" placeholder="e.g., 100" value={stock} onChange={(e) => setStock(e.target.value)} required />
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="productPrice">Price ($) *</Label>
-                <Input id="productPrice" type="number" step="0.01" placeholder="e.g., 99.99" value={price} onChange={(e) => setPrice(e.target.value)} required />
-              </div>
-               <div className="space-y-2">
-                <Label htmlFor="productOriginalPrice">Original Price ($) (Optional)</Label>
-                <Input id="productOriginalPrice" type="number" step="0.01" placeholder="e.g., 129.99" value={originalPrice} onChange={(e) => setOriginalPrice(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="productStock">Stock Quantity *</Label>
-                <Input id="productStock" type="number" placeholder="e.g., 100" value={stock} onChange={(e) => setStock(e.target.value)} required />
+            <Separator />
+
+            {/* Section: Product Attributes */}
+            <div>
+              <h3 className="text-lg font-medium text-foreground mb-4">Product Attributes</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="productType">Type (Optional)</Label>
+                  <Input id="productType" placeholder="e.g., Over-ear, In-ear" value={type} onChange={(e) => setType(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="productColor">Color (Optional)</Label>
+                  <Input id="productColor" placeholder="e.g., Black, Rose Gold" value={color} onChange={(e) => setColor(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="productMaterial">Material (Optional)</Label>
+                  <Input id="productMaterial" placeholder="e.g., Plastic, Aluminum" value={material} onChange={(e) => setMaterial(e.target.value)} />
+                </div>
               </div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="productStatus">Status *</Label>
-                <Select value={status} onValueChange={setStatus} required>
-                  <SelectTrigger id="productStatus">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Draft">Draft</SelectItem>
-                    <SelectItem value="Archived">Archived</SelectItem>
-                    <SelectItem value="Scheduled">Scheduled</SelectItem>
-                  </SelectContent>
-                </Select>
+
+            <Separator />
+
+            {/* Section: Categorization & Status */}
+            <div>
+              <h3 className="text-lg font-medium text-foreground mb-4">Categorization & Status</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="productOffer">Offer/Discount (Optional)</Label>
+                  <Input id="productOffer" placeholder="e.g., 10% Off, Flash Deal" value={offer} onChange={(e) => setOffer(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="productTags">Tags (Optional, comma-separated)</Label>
+                  <Input id="productTags" placeholder="e.g., wireless, noise-cancelling, featured" value={tags} onChange={(e) => setTags(e.target.value)} />
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="productStatus">Status *</Label>
+                    <Select value={status} onValueChange={setStatus} required>
+                      <SelectTrigger id="productStatus">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Active">Active</SelectItem>
+                        <SelectItem value="Draft">Draft</SelectItem>
+                        <SelectItem value="Archived">Archived</SelectItem>
+                        <SelectItem value="Scheduled">Scheduled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
               </div>
+            </div>
+
+            <Separator />
+
+            {/* Section: Product Image */}
+            <div>
+              <h3 className="text-lg font-medium text-foreground mb-4">Product Image *</h3>
               <div className="space-y-2">
-                <Label htmlFor="productImageFile">Product Image *</Label>
-                <Input 
-                  id="productImageFile" 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handleImageChange} 
-                  required
-                />
-                {imageFile && <p className="text-xs text-muted-foreground mt-1">Selected: {imageFile.name}</p>}
+                <Label 
+                  htmlFor="productImageFile" 
+                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-muted/80 transition-colors"
+                >
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
+                    <p className="mb-1 text-sm text-muted-foreground">
+                      <span className="font-semibold">Click to upload</span> or drag and drop
+                    </p>
+                    <p className="text-xs text-muted-foreground">SVG, PNG, JPG or GIF (MAX. 800x400px)</p>
+                  </div>
+                  <Input 
+                    id="productImageFile" 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleImageChange} 
+                    className="hidden"
+                    required 
+                  />
+                </Label>
+                {imageFile && <p className="text-sm text-muted-foreground mt-2">Selected: {imageFile.name}</p>}
                 {imagePreviewUrl && (
-                  <div className="mt-4">
-                    <p className="text-sm font-medium mb-2">Image Preview:</p>
-                    {/* Using native <img> for direct object URL preview. Next/Image is better for optimized images from a server. */}
+                  <div className="mt-4 p-2 border rounded-md inline-block">
+                    <p className="text-sm font-medium mb-2 text-muted-foreground">Image Preview:</p>
                     <img 
                         src={imagePreviewUrl} 
                         alt="Image Preview" 
-                        className="max-w-xs max-h-48 rounded-md border object-contain" 
+                        className="max-w-xs max-h-48 rounded-md object-contain" 
                     />
                   </div>
                 )}
               </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="productType">Type (Optional)</Label>
-                <Input id="productType" placeholder="e.g., Over-ear, In-ear" value={type} onChange={(e) => setType(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="productColor">Color (Optional)</Label>
-                <Input id="productColor" placeholder="e.g., Black, Rose Gold" value={color} onChange={(e) => setColor(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="productMaterial">Material (Optional)</Label>
-                <Input id="productMaterial" placeholder="e.g., Plastic, Aluminum" value={material} onChange={(e) => setMaterial(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="productOffer">Offer (Optional)</Label>
-                <Input id="productOffer" placeholder="e.g., 10% Off, Flash Deal" value={offer} onChange={(e) => setOffer(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="productTags">Tags (Optional, comma-separated)</Label>
-                <Input id="productTags" placeholder="e.g., wireless, noise-cancelling" value={tags} onChange={(e) => setTags(e.target.value)} />
-              </div>
-            </div>
             
-            <div>
-              <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={isLoading}>
+            <Separator className="my-8" />
+
+            <div className="flex justify-end">
+              <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90 min-w-[120px]" disabled={isLoading}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Save Product
               </Button>
             </div>
           </CardContent>
-        </form>
-      </Card>
+        </Card>
+      </form>
     </div>
   );
 }
+
+    
