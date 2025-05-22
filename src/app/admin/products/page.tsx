@@ -24,8 +24,18 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Product } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -39,71 +49,72 @@ export default function AdminProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // State for filter dialog
   const [filterCategory, setFilterCategory] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/products');
+      if (!response.ok) {
+        let errorResponseText = await response.text();
+        let serverErrorMsg = `Server responded with ${response.status}: ${response.statusText || ''}`;
+        try {
+          const errorJson = JSON.parse(errorResponseText);
+          serverErrorMsg = errorJson.error || errorJson.details || serverErrorMsg;
+        } catch (parseError) {
+          if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
+            serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This often indicates a server-side configuration issue (e.g., MONGODB_URI in .env.local is missing/incorrect, or an unhandled error in the API route). Please check your server console logs for more details.`;
+          } else if (errorResponseText) {
+             serverErrorMsg += ` (Raw server response snippet: ${errorResponseText.substring(0,150)}...)`;
+          }
+          console.error("Client-side: Failed to parse API error response as JSON. Status:", response.status, parseError);
+          console.error("Client-side: Original API error response text snippet:", errorResponseText.substring(0, 500));
+        }
+        throw new Error(serverErrorMsg);
+      }
+      const data = await response.json(); 
+      setProducts(data.products || []);
+    } catch (err) {
+      console.error("Full error object in fetchProducts:", err); 
+      const errorToDisplay = err instanceof Error ? err : new Error(String(err));
+      
+      let description = errorToDisplay.message;
+      if (description === 'Failed to fetch') {
+        description = 'Network error or server unreachable. Please check your internet connection and ensure the server is running correctly. Review server console logs for critical errors.';
+      } else if (description.includes("Server returned an HTML error page")) {
+        // Keep the specific HTML error message
+      } else if (typeof errorResponseText !== 'undefined' && errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
+           description = `Server returned an HTML error page. This often indicates a server-side configuration issue. Please check your server console logs for more details.`;
+      }
+
+      setError(description);
+      toast({
+        variant: "destructive",
+        title: "Error Fetching Products",
+        description: description,
+        duration: 9000, 
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]); // Removed errorResponseText from dependency array as it's defined within the scope
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch('/api/products');
-        if (!response.ok) {
-          let errorResponseText = await response.text();
-          let serverErrorMsg = `Server responded with ${response.status}: ${response.statusText || ''}`;
-          try {
-            const errorJson = JSON.parse(errorResponseText);
-            serverErrorMsg = errorJson.error || errorJson.details || serverErrorMsg;
-          } catch (parseError) {
-            if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
-              serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This often indicates a server-side configuration issue (e.g., MONGODB_URI in .env.local is missing/incorrect, or an unhandled error in the API route). Please check your server console logs for more details.`;
-            } else if (errorResponseText) {
-               serverErrorMsg += ` (Raw server response snippet: ${errorResponseText.substring(0,150)}...)`;
-            }
-            console.error("Client-side: Failed to parse API error response as JSON. This usually means the server sent HTML instead of JSON. Status:", response.status, parseError);
-            console.error("Client-side: Original API error response text snippet:", errorResponseText.substring(0, 500));
-          }
-          throw new Error(serverErrorMsg);
-        }
-        const data = await response.json(); 
-        setProducts(data.products || []);
-      } catch (err) {
-        console.error("Full error object in fetchProducts:", err); 
-        const errorToDisplay = err instanceof Error ? err : new Error(String(err));
-        
-        let description = errorToDisplay.message;
-        if (description === 'Failed to fetch') {
-          description = 'Network error or server unreachable. Please check your internet connection and ensure the server is running correctly. Review server console logs for critical errors.';
-        } else if (description.includes("Server returned an HTML error page")) {
-          // Keep the specific HTML error message
-        } else if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
-            // This condition is already handled above, but as a fallback
-             description = `Server returned an HTML error page (status ${response?.status || 'unknown'}). This often indicates a server-side configuration issue. Please check your server console logs for more details.`;
-        }
-
-
-        setError(description);
-        toast({
-          variant: "destructive",
-          title: "Error Fetching Products",
-          description: description,
-          duration: 9000, 
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchProducts();
-  }, [toast]);
+  }, [fetchProducts]);
 
   const handleSeeAllClick = () => {
     toast({
       title: 'Filters Cleared (Mock)',
       description: 'Displaying all products.',
     });
-    // In a real app, you would clear filter states and re-fetch products here.
-    console.log('See All button clicked. Implement navigation or filter clearing logic here.');
+    setFilterCategory('');
+    setFilterStatus('');
+    fetchProducts(); // Re-fetch all products
   };
 
   const handleApplyFilters = () => {
@@ -112,7 +123,30 @@ export default function AdminProductsPage() {
         description: `Category: ${filterCategory || 'Any'}, Status: ${filterStatus || 'Any'}`,
     });
     console.log('Applying filters:', { category: filterCategory, status: filterStatus });
-    // In a real app, you would re-fetch products with these filter parameters.
+    // Implement actual filtering logic here if needed, or fetch filtered data from backend
+  };
+  
+  const confirmDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/products/${productToDelete.id}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || `Failed to delete product. Status: ${response.status}`);
+      }
+      toast({ title: 'Product Deleted', description: `Product "${productToDelete.name}" has been deleted.` });
+      setProductToDelete(null);
+      fetchProducts(); // Re-fetch products after deletion
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      const errorToDisplay = error instanceof Error ? error : new Error(String(error));
+      toast({ variant: 'destructive', title: 'Error Deleting Product', description: errorToDisplay.message });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const renderContent = () => {
@@ -130,7 +164,7 @@ export default function AdminProductsPage() {
         <div className="text-center py-10 px-4">
           <p className="text-destructive font-semibold mb-2">Error loading products:</p>
           <p className="text-muted-foreground mb-4 text-sm break-words">{error}</p>
-          <Button onClick={() => window.location.reload()} className="mt-4">Try Again</Button>
+          <Button onClick={() => fetchProducts()} className="mt-4">Try Again</Button>
         </div>
       );
     }
@@ -174,7 +208,7 @@ export default function AdminProductsPage() {
                 />
                 {product.name}
               </TableCell>
-              <TableCell>{product.category?.name || product.category || 'N/A'}</TableCell>
+              <TableCell>{typeof product.category === 'object' && product.category !== null ? product.category.name : product.category || 'N/A'}</TableCell>
               <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
               <TableCell className="text-right">{product.stock || 0}</TableCell>
               <TableCell>
@@ -196,10 +230,12 @@ export default function AdminProductsPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
-                      <Edit2 className="mr-2 h-4 w-4" /> Edit
+                    <DropdownMenuItem asChild>
+                      <Link href={`/admin/products/edit/${product.id}`}>
+                        <Edit2 className="mr-2 h-4 w-4" /> Edit
+                      </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive">
+                    <DropdownMenuItem onClick={() => setProductToDelete(product)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                       <Trash2 className="mr-2 h-4 w-4" /> Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -243,8 +279,8 @@ export default function AdminProductsPage() {
                             <SelectValue placeholder="Select category" />
                           </SelectTrigger>
                           <SelectContent>
+                            {/* This should be populated dynamically */}
                             <SelectItem value="electronics">Electronics</SelectItem>
-                            <SelectItem value="apparel">Apparel</SelectItem>
                             <SelectItem value="headphones">Headphones</SelectItem>
                             <SelectItem value="accessories">Accessories</SelectItem>
                           </SelectContent>
@@ -301,7 +337,26 @@ export default function AdminProductsPage() {
               <Button variant="outline" size="sm" disabled>Next</Button>
           </div>
         )}
+
+        {productToDelete && (
+            <AlertDialog open={!!productToDelete} onOpenChange={() => setProductToDelete(null)}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the product "{productToDelete.name}".
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setProductToDelete(null)} disabled={isDeleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDeleteProduct} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Delete
+                </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+            </AlertDialog>
+        )}
     </div>
   );
 }
-

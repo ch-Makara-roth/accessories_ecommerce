@@ -19,7 +19,6 @@ async function getProducts(): Promise<Product[]> {
       return []; // Return empty array on error
     }
     // If res.ok, proceed to parse as JSON.
-    // If this line throws the SyntaxError, it means the server sent an HTML page even with a 2xx status, which is highly unusual.
     const data = await res.json();
     return data.products || [];
   } catch (error) {
@@ -33,7 +32,7 @@ export default async function Home() {
   const allProducts = await getProducts();
   
   // Filter for headphones category specifically for the homepage, or adjust as needed
-  const headphoneProducts = allProducts.filter(p => p.category.toLowerCase() === 'headphones');
+  const headphoneProducts = allProducts.filter(p => p.category?.name?.toLowerCase() === 'headphones');
 
   const mainContent = (
     <>
