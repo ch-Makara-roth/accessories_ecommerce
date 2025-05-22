@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import { useState, useEffect, useCallback } from 'react';
-import type { Product, Category as CategoryType } from '@/types'; // Added CategoryType
+import type { Product, Category as CategoryType } from '@/types'; 
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,7 +49,7 @@ export default function AdminProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const [filterCategory, setFilterCategory] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string | undefined>(undefined); // Changed initial state
   const [filterStatus, setFilterStatus] = useState('');
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -88,12 +88,11 @@ export default function AdminProductsPage() {
       let description = errorToDisplay.message;
       if (description === 'Failed to fetch') {
         description = 'Network error or server unreachable. Please check your internet connection and ensure the server is running correctly. Review server console logs for critical errors.';
-      } else if (description.includes("Server returned an HTML error page")) {
+      } else if (description.includes("Server returned an HTML error page") || description.includes("Prisma product model is not accessible")) {
         // Keep the specific HTML error message
       } else if (description.includes("prisma.product is undefined") || description.includes("prisma.product.findMany is not a function") || description.includes("Prisma product model is not accessible")) {
         description = "Internal Server Error: Prisma product model is not accessible. Ensure `npx prisma generate` has been run and server restarted.";
       }
-
 
       setError(description);
       toast({
@@ -124,7 +123,7 @@ export default function AdminProductsPage() {
         title: 'Error Fetching Categories',
         description: error instanceof Error ? error.message : String(error),
       });
-      setAvailableCategories([]); // Ensure it's an empty array on error
+      setAvailableCategories([]); 
     } finally {
       setIsLoadingCategories(false);
     }
@@ -141,18 +140,18 @@ export default function AdminProductsPage() {
       title: 'Filters Cleared (Mock)',
       description: 'Displaying all products.',
     });
-    setFilterCategory('');
+    setFilterCategory(undefined); // Clear category filter
     setFilterStatus('');
-    fetchProducts(); // Re-fetch all products
+    fetchProducts(); 
   };
 
   const handleApplyFilters = () => {
+    const categoryToLog = filterCategory === 'all' || filterCategory === undefined ? 'Any' : filterCategory;
     toast({
         title: 'Filters Applied (Mock)',
-        description: `Category: ${filterCategory || 'Any'}, Status: ${filterStatus || 'Any'}`,
+        description: `Category: ${categoryToLog}, Status: ${filterStatus || 'Any'}`,
     });
     console.log('Applying filters:', { category: filterCategory, status: filterStatus });
-    // Implement actual filtering logic here if needed, or fetch filtered data from backend
   };
   
   const confirmDeleteProduct = async () => {
@@ -168,7 +167,7 @@ export default function AdminProductsPage() {
       }
       toast({ title: 'Product Deleted', description: `Product "${productToDelete.name}" has been deleted.` });
       setProductToDelete(null);
-      fetchProducts(); // Re-fetch products after deletion
+      fetchProducts(); 
     } catch (error) {
       console.error("Error deleting product:", error);
       const errorToDisplay = error instanceof Error ? error : new Error(String(error));
@@ -310,16 +309,16 @@ export default function AdminProductsPage() {
                           <SelectContent>
                             {isLoadingCategories ? (
                                <SelectItem value="loading" disabled>Loading categories...</SelectItem>
-                            ) : availableCategories.length === 0 ? (
-                                <SelectItem value="no-categories" disabled>No categories found</SelectItem>
                             ) : (
                               <>
-                                <SelectItem value="">All Categories</SelectItem>
-                                {availableCategories.map((cat) => (
+                                <SelectItem value="all">All Categories</SelectItem> {/* Changed value */}
+                                {availableCategories.length > 0 ? availableCategories.map((cat) => (
                                   <SelectItem key={cat.id} value={cat.id}>
                                     {cat.name}
                                   </SelectItem>
-                                ))}
+                                )) : (
+                                  <SelectItem value="no-categories-found" disabled>No categories found</SelectItem>
+                                )}
                               </>
                             )}
                           </SelectContent>
@@ -367,7 +366,7 @@ export default function AdminProductsPage() {
           {renderContent()}
         </CardContent>
       </Card>
-       {/* Pagination placeholder */}
+       
         {!loading && !error && products.length > 0 && (
           <div className="flex items-center justify-between mt-6">
               <Button variant="outline" size="sm" disabled>Previous</Button>
