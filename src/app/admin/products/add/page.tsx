@@ -13,10 +13,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Loader2, UploadCloud } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import type { Category as CategoryType } from '@/types';
 
 export default function AddProductPage() {
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState(''); // Will store category ID
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
@@ -31,13 +32,46 @@ export default function AddProductPage() {
   const [tags, setTags] = useState('');
   
   const [isLoading, setIsLoading] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<CategoryType[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+
   const { toast } = useToast();
   const router = useRouter();
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setIsLoadingCategories(true);
+      try {
+        const response = await fetch('/api/categories');
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to fetch categories and parse error response' }));
+          throw new Error(errorData.error || `Failed to fetch categories. Status: ${response.status}`);
+        }
+        const data: CategoryType[] = await response.json();
+        setAvailableCategories(data || []);
+      } catch (error) {
+        console.error("Error fetching categories for dropdown:", error);
+        toast({
+          variant: 'destructive',
+          title: 'Error Fetching Categories',
+          description: error instanceof Error ? error.message : String(error),
+        });
+        setAvailableCategories([]);
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    };
+    fetchCategories();
+  }, [toast]);
+
 
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
       setImageFile(file);
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl); // Revoke old URL before creating new one
+      }
       setImagePreviewUrl(URL.createObjectURL(file));
     } else {
       setImageFile(null);
@@ -49,6 +83,7 @@ export default function AddProductPage() {
   };
 
   useEffect(() => {
+    // Cleanup function to revoke object URL when component unmounts or imagePreviewUrl changes
     return () => {
       if (imagePreviewUrl) {
         URL.revokeObjectURL(imagePreviewUrl);
@@ -58,11 +93,27 @@ export default function AddProductPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!category) {
+      toast({
+        variant: 'destructive',
+        title: 'Category Required',
+        description: 'Please select a category for the product.',
+      });
+      return;
+    }
+    if (!imageFile) {
+      toast({
+        variant: 'destructive',
+        title: 'Image Required',
+        description: 'Please select an image for the product.',
+      });
+      return;
+    }
     setIsLoading(true);
 
     const formData = new FormData();
     formData.append('name', name);
-    formData.append('category', category);
+    formData.append('category', category); // category state holds the ID
     formData.append('description', description);
     formData.append('price', price);
     if (originalPrice) formData.append('originalPrice', originalPrice);
@@ -73,18 +124,7 @@ export default function AddProductPage() {
     if (material) formData.append('material', material);
     if (offer) formData.append('offer', offer);
     formData.append('tags', tags);
-
-    if (imageFile) {
-      formData.append('imageFile', imageFile);
-    } else {
-      toast({
-        variant: 'destructive',
-        title: 'Image Required',
-        description: 'Please select an image for the product.',
-      });
-      setIsLoading(false);
-      return;
-    }
+    formData.append('imageFile', imageFile);
 
     try {
       const response = await fetch('/api/products', {
@@ -92,13 +132,13 @@ export default function AddProductPage() {
         body: formData,
       });
 
+      let errorResult;
+      let serverErrorMsg = `An unexpected error occurred. Status: ${response.status}`;
       if (!response.ok) {
-        let errorResult;
         const errorResponseText = await response.text();
-        let serverErrorMsg = `Server responded with ${response.status}: ${response.statusText || ''}`;
         try {
           errorResult = JSON.parse(errorResponseText);
-          serverErrorMsg = errorResult.error || errorResult.details || serverErrorMsg;
+          serverErrorMsg = errorResult.error || errorResult.details || `Server responded with ${response.status}`;
         } catch (e) {
            if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
              serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This strongly suggests a server-side configuration issue. Please: 1. Verify MONGODB_URI in your .env.local file is correct AND includes your database name. 2. Restart your Next.js server. 3. Check server console logs for more details.`;
@@ -159,7 +199,24 @@ export default function AddProductPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="productCategory">Category *</Label>
-                  <Input id="productCategory" placeholder="e.g., Electronics, Apparel" value={category} onChange={(e) => setCategory(e.target.value)} required />
+                  <Select value={category} onValueChange={setCategory} required disabled={isLoadingCategories}>
+                    <SelectTrigger id="productCategory">
+                      <SelectValue placeholder={isLoadingCategories ? "Loading categories..." : "Select category"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isLoadingCategories ? (
+                        <div className="p-2 text-sm text-muted-foreground text-center">Loading categories...</div>
+                      ) : availableCategories.length === 0 ? (
+                        <div className="p-2 text-sm text-muted-foreground text-center">No categories found. Add categories first.</div>
+                      ) : (
+                        availableCategories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="productDescription">Description *</Label>
@@ -264,7 +321,7 @@ export default function AddProductPage() {
                     accept="image/*" 
                     onChange={handleImageChange} 
                     className="hidden"
-                    required 
+                    // required is handled by the submit handler check for imageFile
                   />
                 </Label>
                 {imageFile && <p className="text-sm text-muted-foreground mt-2">Selected: {imageFile.name}</p>}
@@ -284,7 +341,7 @@ export default function AddProductPage() {
             <Separator className="my-8" />
 
             <div className="flex justify-end">
-              <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90 min-w-[120px]" disabled={isLoading}>
+              <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90 min-w-[120px]" disabled={isLoading || isLoadingCategories}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Save Product
               </Button>
@@ -295,5 +352,6 @@ export default function AddProductPage() {
     </div>
   );
 }
+    
 
     
