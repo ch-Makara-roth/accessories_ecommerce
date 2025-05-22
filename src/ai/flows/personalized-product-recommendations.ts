@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -58,8 +59,19 @@ const personalizedProductRecommendationsFlow = ai.defineFlow(
     inputSchema: PersonalizedProductRecommendationsInputSchema,
     outputSchema: PersonalizedProductRecommendationsOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input): Promise<PersonalizedProductRecommendationsOutput> => {
+    try {
+      const {output} = await prompt(input);
+      if (output) {
+        return output;
+      }
+      // If output is null/undefined for some reason, return empty recommendations
+      console.warn('Personalized product recommendations prompt returned no output, returning empty recommendations.');
+      return { productRecommendations: [] };
+    } catch (error) {
+      console.error("Error in personalizedProductRecommendationsFlow:", error);
+      // Return an empty list of recommendations as a fallback
+      return { productRecommendations: [] };
+    }
   }
 );
