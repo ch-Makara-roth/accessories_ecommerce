@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ChangeEvent } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
@@ -20,8 +20,8 @@ export default function AddProductPage() {
   const [price, setPrice] = useState('');
   const [originalPrice, setOriginalPrice] = useState('');
   const [stock, setStock] = useState('');
-  const [status, setStatus] = useState('Draft'); // Default status
-  const [image, setImage] = useState('');
+  const [status, setStatus] = useState('Draft');
+  const [imageFile, setImageFile] = useState<File | null>(null); // Changed from image URL string to File
   const [type, setType] = useState('');
   const [color, setColor] = useState('');
   const [material, setMaterial] = useState('');
@@ -32,33 +32,50 @@ export default function AddProductPage() {
   const { toast } = useToast();
   const router = useRouter();
 
+  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      setImageFile(event.target.files[0]);
+    } else {
+      setImageFile(null);
+    }
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
 
-    const productData = {
-      name,
-      category,
-      description,
-      price: parseFloat(price),
-      originalPrice: originalPrice ? parseFloat(originalPrice) : undefined,
-      stock: parseInt(stock, 10),
-      status,
-      image,
-      type,
-      color,
-      material,
-      offer,
-      tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag), // Split tags by comma
-    };
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('category', category);
+    formData.append('description', description);
+    formData.append('price', price);
+    if (originalPrice) formData.append('originalPrice', originalPrice);
+    formData.append('stock', stock);
+    formData.append('status', status);
+    if (type) formData.append('type', type);
+    if (color) formData.append('color', color);
+    if (material) formData.append('material', material);
+    if (offer) formData.append('offer', offer);
+    formData.append('tags', tags); // Will be sent as comma-separated string
+
+    if (imageFile) {
+      formData.append('imageFile', imageFile); // Changed key to 'imageFile'
+    } else {
+      // If image is required and no file is selected, you might want to show an error
+      toast({
+        variant: 'destructive',
+        title: 'Image Required',
+        description: 'Please select an image for the product.',
+      });
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch('/api/products', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(productData),
+        // 'Content-Type' header is automatically set by the browser when using FormData
+        body: formData,
       });
 
       if (!response.ok) {
@@ -69,7 +86,6 @@ export default function AddProductPage() {
           errorResult = JSON.parse(errorResponseText);
           serverErrorMsg = errorResult.error || errorResult.details || serverErrorMsg;
         } catch (e) {
-          // If JSON.parse fails, it means the server sent something else (e.g., HTML)
           if (errorResponseText && errorResponseText.trim().toLowerCase().startsWith('<!doctype html>')) {
              serverErrorMsg = `Server returned an HTML error page (status ${response.status}). This strongly suggests a server-side configuration issue. Please: 1. Verify MONGODB_URI in your .env.local file is correct AND includes your database name. 2. Restart your Next.js server. 3. Check server console logs for more details.`;
           } else if (errorResponseText) {
@@ -80,23 +96,22 @@ export default function AddProductPage() {
         throw new Error(serverErrorMsg);
       }
 
-      const result = await response.json(); // Expect JSON if response.ok
+      const result = await response.json();
 
       toast({
         title: 'Success!',
-        description: `Product "${result.product.name}" added successfully.`,
+        description: `Product "${result.product.name}" added successfully. Image URL (simulated): ${result.product.image}`,
       });
-      router.push('/admin/products'); // Redirect to product list
+      router.push('/admin/products');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-      // Determine toast duration based on error message content
       const isHtmlError = errorMessage.includes("Server returned an HTML error page");
       
       toast({
         variant: 'destructive',
         title: 'Error Adding Product',
         description: errorMessage,
-        duration: isHtmlError ? 9000 : 5000, // Longer duration for critical config error
+        duration: isHtmlError ? 9000 : 5000,
       });
       console.error("Error adding product (handleSubmit):", error);
     } finally {
@@ -166,8 +181,15 @@ export default function AddProductPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="productImage">Product Image URL *</Label>
-                <Input id="productImage" placeholder="https://placehold.co/600x400.png" value={image} onChange={(e) => setImage(e.target.value)} required />
+                <Label htmlFor="productImageFile">Product Image *</Label>
+                <Input 
+                  id="productImageFile" 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageChange} 
+                  required // Making file input required
+                />
+                {imageFile && <p className="text-sm text-muted-foreground mt-1">Selected: {imageFile.name}</p>}
               </div>
             </div>
 
