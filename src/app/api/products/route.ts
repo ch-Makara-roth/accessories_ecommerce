@@ -2,21 +2,13 @@
 // src/app/api/products/route.ts
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma'; // Import Prisma client
+import prisma from '@/lib/prisma';
 import type { Product } from '@/types'; // Ensure your types are correctly defined
-import { ObjectId } from 'mongodb'; // Keep for GET for now if it uses it
 
-// Configuration for direct MongoDB client (used by GET)
-const DATABASE_NAME = process.env.MONGODB_DB_NAME || 'accessorice-app';
-const COLLECTION_NAME = 'accessorice-app'; // Explicitly using the collection name from your image
+// GET handler remains the same
 
 export async function GET(request: NextRequest) {
   try {
-    if (!DATABASE_NAME) {
-      console.error(`API GET /api/products Error: Database name is not configured. MONGODB_DB_NAME env variable is missing or fallback invalid. Current fallback: ${DATABASE_NAME}`);
-      return NextResponse.json({ error: 'Database configuration error', details: 'Database name not found.' }, { status: 500 });
-    }
-
     // Using Prisma for GET as well for consistency
     const productsFromDB = await prisma.product.findMany({
       orderBy: { name: 'asc' },
@@ -24,8 +16,8 @@ export async function GET(request: NextRequest) {
     });
 
     const sanitizedProducts: Product[] = productsFromDB.map(productDoc => ({
-      id: productDoc.id, // Prisma uses 'id' by default which is string for MongoDB ObjectId
-      _id: productDoc.id, // For compatibility if any part still expects _id as string
+      id: productDoc.id,
+      _id: productDoc.id,
       name: productDoc.name || 'Unknown Product',
       price: typeof productDoc.price === 'number' ? productDoc.price : 0,
       originalPrice: typeof productDoc.originalPrice === 'number' ? productDoc.originalPrice : (productDoc.originalPrice === null ? undefined : 0),
@@ -33,7 +25,7 @@ export async function GET(request: NextRequest) {
       reviewCount: typeof productDoc.reviewCount === 'number' ? productDoc.reviewCount : (productDoc.reviewCount === null ? 0 : 0),
       description: productDoc.description || '',
       image: productDoc.image || 'https://placehold.co/600x400.png',
-      category: productDoc.category, // Prisma will return the related category object
+      category: productDoc.category,
       type: productDoc.type || '',
       color: productDoc.color || '',
       material: productDoc.material || '',
@@ -48,38 +40,40 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ products: sanitizedProducts }, { status: 200 });
 
   } catch (e: any) {
-    console.error('API GET /api/products Error:', e);
     let errorMessage = 'An unexpected error occurred while fetching products.';
-    if (e instanceof Error) {
-      errorMessage = e.message;
-    }
-    if (e.name === 'MongoServerSelectionError' || e.name === 'MongoNetworkError' || e.message?.includes('ECONNREFUSED')) {
+    let errorDetails = e.message;
+    console.error('API GET /api/products Error:', e);
+
+    if (e.name === 'MongoServerSelectionError' || e.name === 'MongoNetworkError' || e.message?.includes('ECONNREFUSED') || e.message?.includes('tlsv1 alert internal error')) {
         errorMessage = `MongoDB Connection Error: ${e.message}. Please verify MONGODB_URI and DATABASE_URL in .env.local. Ensure MongoDB Atlas IP Access List includes your current IP and the server is restarted. Also, check server console logs.`;
+    } else if (e.message?.includes("Environment variable not found: DATABASE_URL")) {
+        errorMessage = "CRITICAL: DATABASE_URL environment variable is not defined. Please set it in .env.local and restart the server.";
     }
-    return NextResponse.json({ error: 'Failed to fetch products', details: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch products', details: errorDetails, message: errorMessage }, { status: 500 });
   }
 }
 
+
 export async function POST(request: NextRequest) {
   try {
-    console.log('Received POST request to /api/products');
-
-    // Detailed Prisma client logging
+    // Enhanced logging for debugging Prisma client state
     if (!prisma) {
-      console.error('CRITICAL: Prisma client (imported as `prisma`) is undefined in POST /api/products!');
-      return NextResponse.json({ error: 'Internal Server Error: Prisma client is not initialized. Check server logs, .env.local for DATABASE_URL, and ensure server was restarted.' }, { status: 500 });
+      console.error('API POST /api/products: CRITICAL - Prisma client (imported as `prisma`) is undefined!');
+      return NextResponse.json({ error: 'Internal Server Error: Prisma client is not initialized. Check server logs, DATABASE_URL in .env.local, and ensure server was restarted.' }, { status: 500 });
     }
+    // Check if prisma.product is available
     if (!prisma.product) {
-        console.error('CRITICAL: prisma.product is undefined. Prisma client might be initialized but models are not accessible. Ensure `npx prisma generate` has been run successfully after any schema changes and the server was restarted.');
+        console.error('API POST /api/products: CRITICAL - prisma.product is undefined. This means the Prisma client is initialized but models are not accessible. Ensure `npx prisma generate` has been run successfully after any schema changes and the server was restarted.');
         return NextResponse.json({ error: 'Internal Server Error: Prisma product model is not accessible. Ensure `npx prisma generate` has been run and server restarted.' }, { status: 500 });
     }
-    console.log('Prisma client and prisma.product seem available.');
+    console.log('API POST /api/products: Prisma client and prisma.product seem available.');
+
 
     const formData = await request.formData();
     const productFields: Record<string, any> = {};
-    
+
     formData.forEach((value, key) => {
-      if (key !== 'imageFile') { // Exclude the file itself from productFields for direct DB storage
+      if (key !== 'imageFile') {
         productFields[key] = value;
       }
     });
@@ -87,27 +81,22 @@ export async function POST(request: NextRequest) {
     if (!productFields.name || !productFields.price || !productFields.category || !productFields.description) {
       return NextResponse.json({ error: 'Missing required product fields (name, price, category, description)' }, { status: 400 });
     }
-    
+
     let imageUrl = `https://placehold.co/600x400.png?text=${encodeURIComponent(String(productFields.name).substring(0,20)) || 'No+Image'}`;
     const imageFile = formData.get('imageFile') as File | null;
 
     if (imageFile) {
-      // SIMULATE UPLOAD: In a real app, upload to cloud storage (S3, Firebase Storage, etc.) and get URL
-      console.log(`SIMULATING UPLOAD: Received image file: ${imageFile.name}, size: ${imageFile.size}, type: ${imageFile.type}. Using placeholder URL.`);
-      // Using a placeholder that incorporates the filename for better visual feedback
+      console.log(`API POST /api/products: SIMULATING UPLOAD - Received image file: ${imageFile.name}, size: ${imageFile.size}, type: ${imageFile.type}. Using placeholder URL.`);
       imageUrl = `https://placehold.co/600x400.png?text=Uploaded+${encodeURIComponent(imageFile.name.substring(0,15))}`;
     } else {
-        console.log("No image file provided for product:", productFields.name);
+        console.log("API POST /api/products: No image file provided for product:", productFields.name);
     }
-    
+
     const dataToCreate: any = {
       name: String(productFields.name),
       price: parseFloat(String(productFields.price)) || 0,
       description: String(productFields.description),
-      image: imageUrl, // Storing the (placeholder) URL
-      // category field for Prisma should be a connect operation if category is a relation
-      // For now, assuming 'category' from form is category name for simplicity in this version
-      // categoryId: productFields.category, // This should be an ID if linking to an existing Category
+      image: imageUrl,
       originalPrice: productFields.originalPrice ? parseFloat(String(productFields.originalPrice)) : null,
       stock: productFields.stock ? parseInt(String(productFields.stock), 10) : 0,
       status: String(productFields.status || 'Draft'),
@@ -117,22 +106,19 @@ export async function POST(request: NextRequest) {
       offer: productFields.offer ? String(productFields.offer) : null,
       tags: typeof productFields.tags === 'string' ? productFields.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
       dataAiHint: `${productFields.category || 'product'} ${productFields.name || 'item'}`.substring(0, 50).toLowerCase(),
+      rating: 0, // Default rating
+      reviewCount: 0, // Default review count
     };
 
-     // If you have a categoryId from the form and want to connect to an existing category:
-    if (productFields.category) { // Assuming productFields.category contains the ID of the category
+    if (productFields.category) {
       const categoryId = String(productFields.category);
-      // Optional: verify categoryId exists before attempting to connect
       const categoryExists = await prisma.category.findUnique({ where: { id: categoryId } });
       if (categoryExists) {
         dataToCreate.category = { connect: { id: categoryId } };
       } else {
-        console.warn(`Category with ID "${categoryId}" not found. Product will be created without category linkage.`);
-        // Decide if you want to prevent product creation or create it without category
-        // For now, it will create without linkage if category not found
+        console.warn(`API POST /api/products: Category with ID "${categoryId}" not found. Product will be created without category linkage.`);
       }
     }
-
 
     if (isNaN(dataToCreate.price)) {
       return NextResponse.json({ error: 'Price must be a valid number.' }, { status: 400 });
@@ -167,9 +153,7 @@ export async function POST(request: NextRequest) {
     } else if (e instanceof Error) {
       errorMessage = e.message;
     }
-    
+
     return NextResponse.json({ error: 'Failed to add product', details: errorDetails, message: errorMessage }, { status: 500 });
   }
 }
-
-    
