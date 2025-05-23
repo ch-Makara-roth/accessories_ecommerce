@@ -36,10 +36,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"; 
-import { Input } from '@/components/ui/input'; // Added Input import
-import { useToast } from '@/hooks/use-toast'; // Added useToast import
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect, type KeyboardEvent } from 'react'; // Added KeyboardEvent
+import { useState, useEffect, type KeyboardEvent } from 'react';
 import Logo from '@/components/common/Logo'; 
 
 
@@ -60,8 +60,8 @@ export default function AdminLayout({
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const mockUnreadNotifications = 3; 
-  const [isSearchVisible, setIsSearchVisible] = useState(false); // State for admin search input
-  const [adminSearchTerm, setAdminSearchTerm] = useState(''); // State for admin search term
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [adminSearchTerm, setAdminSearchTerm] = useState('');
   const { toast } = useToast();
 
   const navItems: AdminNavItem[] = [
@@ -197,11 +197,7 @@ export default function AdminLayout({
         <nav className="flex-grow p-2 space-y-1">
           {renderNavItems()}
         </nav>
-        <div className="p-4 border-t mt-auto">
-          <Button variant="outline" className="w-full" asChild>
-            <Link href="/">Back to Shop</Link>
-          </Button>
-        </div>
+        {/* Removed "Back to Shop" button from here */}
       </aside>
 
       <div className="flex-1 flex flex-col">
@@ -229,11 +225,7 @@ export default function AdminLayout({
                 <nav className="flex-grow p-4 space-y-2 overflow-y-auto">
                     {renderNavItems(true)}
                 </nav>
-                <div className="p-4 border-t mt-auto">
-                    <Button variant="outline" className="w-full" asChild>
-                        <Link href="/" onClick={() => setIsSheetOpen(false)}>Back to Shop</Link>
-                    </Button>
-                </div>
+                {/* Also removed "Back to Shop" button from mobile sheet footer */}
             </SheetContent>
           </Sheet>
 
@@ -250,7 +242,7 @@ export default function AdminLayout({
                   <Input
                     type="search"
                     placeholder="Search admin..."
-                    className="h-9 w-40 md:w-56 text-sm" // Adjusted width
+                    className="h-9 w-40 md:w-56 text-sm" 
                     value={adminSearchTerm}
                     onChange={(e) => setAdminSearchTerm(e.target.value)}
                     onKeyDown={handleAdminSearchSubmit}
@@ -300,4 +292,3 @@ export default function AdminLayout({
     </div>
   );
 }
-
