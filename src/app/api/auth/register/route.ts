@@ -4,20 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { addMinutes } from 'date-fns';
-
-// Placeholder for actual email sending function
-// In a real app, you would implement this using a library like nodemailer
-// and an email service provider (e.g., SendGrid, AWS SES).
-// async function sendOtpEmail(email: string, otp: string) {
-//   console.log(`--- SIMULATING EMAIL SEND ---`);
-//   console.log(`To: ${email}`);
-//   console.log(`OTP: ${otp}`);
-//   console.log(`-----------------------------`);
-//   // Example with nodemailer (requires setup and credentials):
-//   // let transporter = nodemailer.createTransport({ service: 'YourService', auth: { user: '...', pass: '...' } });
-//   // await transporter.sendMail({ from: 'no-reply@yourapp.com', to: email, subject: 'Your OTP Code', text: `Your OTP is: ${otp}` });
-//   return Promise.resolve();
-// }
+import { sendOtpEmail } from '@/lib/email'; // Import the new email utility
 
 function generateOtp(length: number = 6): string {
   const digits = '0123456789';
@@ -52,8 +39,10 @@ export async function POST(req: NextRequest) {
       if (existingUser.emailVerified) {
         return NextResponse.json({ error: 'User with this email already exists and is verified. Please login.' }, { status: 409 });
       }
-      // If user exists but not verified, delete them to allow re-registration with new OTP process.
-      // A more complex flow might update them, but this is simpler for now.
+      // If user exists but not verified, we could update them or delete and re-create.
+      // For simplicity, and to ensure a fresh OTP process, let's delete and re-create.
+      // This also handles cases where previous registration attempt might have failed midway.
+      console.log(`Existing unverified user found for ${email}. Deleting to allow re-registration.`);
       await prisma.user.delete({ where: { email }});
     }
 
@@ -73,7 +62,7 @@ export async function POST(req: NextRequest) {
     const hashedOtp = await bcrypt.hash(otpCode, 10);
     const expiresAt = addMinutes(new Date(), 10); 
 
-    await prisma.otp.deleteMany({ where: { email } });
+    await prisma.otp.deleteMany({ where: { email } }); // Clear any old OTPs for this email
     await prisma.otp.create({
       data: {
         email,
@@ -83,12 +72,18 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Log OTP for testing AND simulate sending email
-    console.log(`REGISTRATION OTP for ${email}: ${otpCode} (User ID: ${newUser.id})`);
-    // await sendOtpEmail(email, otpCode); // << --- UNCOMMENT AND IMPLEMENT THIS for real email sending
+    // Send OTP email
+    try {
+      await sendOtpEmail(email, otpCode);
+      console.log(`Registration OTP for ${email} sent via email. Fallback OTP logged: ${otpCode}`);
+    } catch (emailError) {
+      console.error(`Failed to send registration OTP email to ${email}, but OTP is generated: ${otpCode}`, emailError);
+      // Continue the process even if email fails, user can check console log.
+    }
+    
 
     return NextResponse.json({
-      message: 'Registration successful. An OTP has been sent to your email (and logged to console for testing). Please verify to continue.',
+      message: 'Registration successful. An OTP has been sent to your email. Please verify to continue. (Check server console for OTP if email is not received).',
       emailForOtp: email
     }, { status: 201 });
 
@@ -98,6 +93,4 @@ export async function POST(req: NextRequest) {
     if (error instanceof Error) {
         errorMessage = error.message;
     }
-    return NextResponse.json({ error: 'Failed to register user', details: errorMessage }, { status: 500 });
-  }
-}
+    return NextResponse.json({ error: 'Failed to register user',

@@ -1,23 +1,9 @@
-
 // src/app/api/auth/otp/request/route.ts
 import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { addMinutes } from 'date-fns'; // For OTP expiry
-
-// Placeholder for actual email sending function
-// In a real app, you would implement this using a library like nodemailer
-// and an email service provider (e.g., SendGrid, AWS SES).
-// async function sendOtpEmail(email: string, otp: string) {
-//   console.log(`--- SIMULATING EMAIL SEND ---`);
-//   console.log(`To: ${email}`);
-//   console.log(`OTP: ${otp}`);
-//   console.log(`-----------------------------`);
-//   // Example with nodemailer (requires setup and credentials):
-//   // let transporter = nodemailer.createTransport({ service: 'YourService', auth: { user: '...', pass: '...' } });
-//   // await transporter.sendMail({ from: 'no-reply@yourapp.com', to: email, subject: 'Your OTP Code', text: `Your OTP is: ${otp}` });
-//   return Promise.resolve();
-// }
+import { sendOtpEmail } from '@/lib/email'; // Import the new email utility
 
 function generateOtp(length: number = 6): string {
   const digits = '0123456789';
@@ -55,9 +41,14 @@ export async function POST(req: NextRequest) {
     const hashedOtp = await bcrypt.hash(otpCode, 10);
     const expiresAt = addMinutes(new Date(), 10); // OTP expires in 10 minutes
 
-    // Log OTP for testing AND simulate sending email
-    console.log(`RESEND OTP for ${email}: ${otpCode}`);
-    // await sendOtpEmail(email, otpCode); // << --- UNCOMMENT AND IMPLEMENT THIS for real email sending
+    // Send OTP email
+     try {
+      await sendOtpEmail(email, otpCode);
+      console.log(`Resend OTP for ${email} sent via email. Fallback OTP logged: ${otpCode}`);
+    } catch (emailError) {
+      console.error(`Failed to resend OTP email to ${email}, but OTP is generated: ${otpCode}`, emailError);
+      // Continue the process even if email fails, user can check console log.
+    }
 
     await prisma.otp.deleteMany({ where: { email }});
     await prisma.otp.create({
@@ -69,7 +60,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ message: 'New OTP generated and sent to your email (and logged to console for testing).' }, { status: 200 });
+    return NextResponse.json({ message: 'New OTP generated and sent to your email (Check server console for OTP if email is not received).' }, { status: 200 });
 
   } catch (error) {
     console.error('OTP Request Error:', error);
