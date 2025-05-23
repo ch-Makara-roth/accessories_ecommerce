@@ -18,6 +18,7 @@ import {
   Search, 
   Menu, 
   X,
+  LogOut, // Added LogOut icon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -197,7 +198,12 @@ export default function AdminLayout({
         <nav className="flex-grow p-2 space-y-1">
           {renderNavItems()}
         </nav>
-        {/* Removed "Back to Shop" button from here */}
+        <div className="p-4 border-t mt-auto">
+          <Button variant="outline" className="w-full" onClick={() => alert('Admin Logout clicked!')}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </Button>
+        </div>
       </aside>
 
       <div className="flex-1 flex flex-col">
@@ -216,7 +222,7 @@ export default function AdminLayout({
                      <SheetTitle>Admin Menu</SheetTitle>
                    </Link>
                     <SheetTrigger asChild>
-                       <Button variant="ghost" size="icon" className="text-muted-foreground">
+                       <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => setIsSheetOpen(false)}>
                         <X className="h-5 w-5" />
                         <span className="sr-only">Close menu</span>
                       </Button>
@@ -225,7 +231,12 @@ export default function AdminLayout({
                 <nav className="flex-grow p-4 space-y-2 overflow-y-auto">
                     {renderNavItems(true)}
                 </nav>
-                {/* Also removed "Back to Shop" button from mobile sheet footer */}
+                 <div className="p-4 border-t mt-auto">
+                  <Button variant="outline" className="w-full" onClick={() => { alert('Admin Logout clicked!'); setIsSheetOpen(false); }}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </Button>
+                </div>
             </SheetContent>
           </Sheet>
 
