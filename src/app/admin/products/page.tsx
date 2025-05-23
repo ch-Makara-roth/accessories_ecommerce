@@ -47,11 +47,11 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Product, Category as CategoryType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
-import { useSession } from 'next-auth/react'; // Import useSession
-import type { Role } from '@prisma/client'; // Import Role
+import { useSession } from 'next-auth/react';
+import { Role } from '@prisma/client'; // Import Role enum
 
 export default function AdminProductsPage() {
-  const { data: session } = useSession(); // Get session
+  const { data: session } = useSession();
   const userRole = session?.user?.role;
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -61,6 +61,7 @@ export default function AdminProductsPage() {
 
   const [selectedCategoryIdsInDialog, setSelectedCategoryIdsInDialog] = useState<string[]>([]);
   const [selectedStatusesInDialog, setSelectedStatusesInDialog] = useState<string[]>([]);
+  
   const [appliedCategoryIds, setAppliedCategoryIds] = useState<string[]>([]);
   const [appliedStatuses, setAppliedStatuses] = useState<string[]>([]);
 
@@ -76,17 +77,17 @@ export default function AdminProductsPage() {
 
   const availableStatuses = ['Active', 'Draft', 'Archived', 'Scheduled'];
 
-  const fetchProducts = useCallback(async (categoryIds?: string[], statuses?: string[]) => {
+  const fetchProducts = useCallback(async (categoryIdsToFetch?: string[], statusesToFetch?: string[]) => {
     setLoading(true);
     setError(null);
     let url = '/api/products';
     const queryParams = new URLSearchParams();
 
-    if (categoryIds && categoryIds.length > 0) {
-      queryParams.append('categoryId', categoryIds.join(','));
+    if (categoryIdsToFetch && categoryIdsToFetch.length > 0) {
+      queryParams.append('categoryId', categoryIdsToFetch.join(','));
     }
-    if (statuses && statuses.length > 0) {
-      queryParams.append('status', statuses.join(','));
+    if (statusesToFetch && statusesToFetch.length > 0) {
+      queryParams.append('status', statusesToFetch.join(','));
     }
 
     const queryString = queryParams.toString();
@@ -175,13 +176,14 @@ export default function AdminProductsPage() {
   }, [fetchCategoriesForFilter]);
 
   useEffect(() => {
+    // Sync dialog selections with applied filters when dialog opens
     if (isFilterDialogOpen) {
       setSelectedCategoryIdsInDialog([...appliedCategoryIds]);
       setSelectedStatusesInDialog([...appliedStatuses]);
     }
   }, [isFilterDialogOpen, appliedCategoryIds, appliedStatuses]);
 
-  const handleApplyFilters = () => {
+  const handleApplyFiltersInDialog = () => {
     setAppliedCategoryIds([...selectedCategoryIdsInDialog]);
     setAppliedStatuses([...selectedStatusesInDialog]);
 
@@ -196,22 +198,22 @@ export default function AdminProductsPage() {
     if (activeCategoryNames.length === 0 && selectedStatusesInDialog.length === 0) {
       filterDesc = "Showing all products.";
     }
+    
     toast({ title: 'Product Filters Updated', description: filterDesc });
-    setIsFilterDialogOpen(false);
+    setIsFilterDialogOpen(false); // Close dialog after applying
   };
   
-  const handleClearDialogFilters = () => {
+  const handleClearDialogSelections = () => {
     setSelectedCategoryIdsInDialog([]);
     setSelectedStatusesInDialog([]);
     setCategorySearchTerm('');
     setStatusSearchTerm('');
-    // Note: This only clears selections in the dialog, not the applied filters.
   };
 
   const handleResetAllFilters = () => {
     setAppliedCategoryIds([]);
     setAppliedStatuses([]);
-    setSelectedCategoryIdsInDialog([]);
+    setSelectedCategoryIdsInDialog([]); // Also clear dialog selections
     setSelectedStatusesInDialog([]);
     setCategorySearchTerm('');
     setStatusSearchTerm('');
@@ -265,7 +267,7 @@ export default function AdminProductsPage() {
   
   const canAddProduct = userRole === Role.ADMIN || userRole === Role.SELLER;
   const canDeleteProduct = userRole === Role.ADMIN;
-  const canEditProduct = userRole === Role.ADMIN || userRole === Role.SELLER; // Or just ADMIN, depending on reqs
+  const canEditProduct = userRole === Role.ADMIN || userRole === Role.SELLER;
 
   const renderContent = () => {
     if (loading) {
@@ -385,22 +387,22 @@ export default function AdminProductsPage() {
           <div className="flex items-center gap-2">
             <Dialog open={isFilterDialogOpen} onOpenChange={(open) => {
                 setIsFilterDialogOpen(open);
-                if (!open) { // Dialog is closing without explicit "Apply"
-                    handleApplyFilters(); // Apply filters when dialog closes
+                if (!open) { 
+                   // User closed dialog without explicit "Apply", so we apply current dialog selections
+                   handleApplyFiltersInDialog();
                 }
             }}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
-                  <FilterIcon className="mr-2 h-4 w-4" /> Filters
-                  {activeFilterCount > 0 && (
-                    <span className="ml-2 bg-background text-primary rounded-full px-1.5 py-0.5 text-xs font-semibold">
-                      {activeFilterCount}
-                    </span>
-                  )}
+                    <FilterIcon className="mr-2 h-4 w-4" /> Filters
+                    {activeFilterCount > 0 && (
+                       <span className="ml-2 bg-background text-primary rounded-full px-1.5 py-0.5 text-xs font-semibold">
+                         {activeFilterCount}
+                       </span>
+                    )}
                 </Button>
               </DialogTrigger>
-              <DialogOverlay className="bg-transparent" />
-              <DialogContent className="sm:max-w-lg p-0">
+              <DialogContent className="sm:max-w-lg p-0"> {/* Custom width */}
                 <DialogHeader className="p-4 border-b">
                   <div className="flex items-center justify-between">
                     <DialogTitle className="text-lg font-semibold">Filters</DialogTitle>
@@ -408,71 +410,72 @@ export default function AdminProductsPage() {
                   </div>
                 </DialogHeader>
                 <div className="p-4 space-y-4">
-                  <Accordion type="multiple" className="w-full space-y-2" defaultValue={['category-filter', 'status-filter']}>
-                    <AccordionItem value="category-filter" className="border-b-0">
-                      <AccordionTrigger className="text-sm font-medium hover:no-underline py-2 px-1 rounded hover:bg-muted/50">Category</AccordionTrigger>
-                      <AccordionContent className="pt-2 space-y-2">
-                        <div className="relative">
-                          <Input
-                            placeholder="Search categories..."
-                            value={categorySearchTerm}
-                            onChange={(e) => setCategorySearchTerm(e.target.value)}
-                            className="pl-8 text-xs h-8"
-                          />
-                          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                        </div>
-                        <ScrollArea className="h-[150px] pr-3">
-                          <div className="space-y-1.5">
-                            {isLoadingCategories ? <p className="text-xs text-muted-foreground">Loading categories...</p> :
-                              filteredDisplayCategories.length > 0 ? filteredDisplayCategories.map(cat => (
-                                <div key={cat.id} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={`cat-${cat.id}`}
-                                    checked={selectedCategoryIdsInDialog.includes(cat.id)}
-                                    onCheckedChange={() => handleCategoryCheckboxChange(cat.id)}
-                                  />
-                                  <Label htmlFor={`cat-${cat.id}`} className="text-xs font-normal cursor-pointer">{cat.name}</Label>
+                    <Accordion type="multiple" className="w-full space-y-2"  defaultValue={['category-filter', 'status-filter']}>
+                        <AccordionItem value="category-filter" className="border-b-0">
+                            <AccordionTrigger className="text-sm font-medium hover:no-underline py-2 px-1 rounded hover:bg-muted/50">Category</AccordionTrigger>
+                            <AccordionContent className="pt-2 space-y-2">
+                                <div className="relative">
+                                    <Input 
+                                        placeholder="Search categories..." 
+                                        value={categorySearchTerm}
+                                        onChange={(e) => setCategorySearchTerm(e.target.value)}
+                                        className="pl-8 text-xs h-8"
+                                    />
+                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                                 </div>
-                              )) : <p className="text-xs text-muted-foreground">No categories found.</p>}
-                          </div>
-                        </ScrollArea>
-                        <Link href="#" className="text-xs text-primary hover:underline mt-1 block" onClick={(e) => e.preventDefault()}>View all...</Link>
-                      </AccordionContent>
-                    </AccordionItem>
+                                <ScrollArea className="h-[150px] pr-3">
+                                    <div className="space-y-1.5">
+                                    {isLoadingCategories ? <p className="text-xs text-muted-foreground">Loading categories...</p> :
+                                     filteredDisplayCategories.length > 0 ? filteredDisplayCategories.map(cat => (
+                                        <div key={cat.id} className="flex items-center space-x-2">
+                                            <Checkbox 
+                                                id={`cat-${cat.id}`} 
+                                                checked={selectedCategoryIdsInDialog.includes(cat.id)}
+                                                onCheckedChange={() => handleCategoryCheckboxChange(cat.id)}
+                                            />
+                                            <Label htmlFor={`cat-${cat.id}`} className="text-xs font-normal cursor-pointer">{cat.name}</Label>
+                                        </div>
+                                     )) : <p className="text-xs text-muted-foreground">No categories found.</p>}
+                                    </div>
+                                </ScrollArea>
+                                 <Link href="#" className="text-xs text-primary hover:underline mt-1 block" onClick={(e) => e.preventDefault()}>View all...</Link>
+                            </AccordionContent>
+                        </AccordionItem>
+                        
+                        <Separator />
 
-                    <Separator />
-
-                    <AccordionItem value="status-filter" className="border-b-0">
-                      <AccordionTrigger className="text-sm font-medium hover:no-underline py-2 px-1 rounded hover:bg-muted/50">Status</AccordionTrigger>
-                      <AccordionContent className="pt-2 space-y-2">
-                        <div className="relative">
-                          <Input
-                            placeholder="Search statuses..."
-                            value={statusSearchTerm}
-                            onChange={(e) => setStatusSearchTerm(e.target.value)}
-                            className="pl-8 text-xs h-8"
-                          />
-                          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                        </div>
-                        <ScrollArea className="h-[100px] pr-3">
-                          <div className="space-y-1.5">
-                            {filteredDisplayStatuses.map(status => (
-                              <div key={status} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`status-${status}`}
-                                  checked={selectedStatusesInDialog.includes(status)}
-                                  onCheckedChange={() => handleStatusCheckboxChange(status)}
-                                />
-                                <Label htmlFor={`status-${status}`} className="text-xs font-normal cursor-pointer">{status}</Label>
-                              </div>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                        <Link href="#" className="text-xs text-primary hover:underline mt-1 block" onClick={(e) => e.preventDefault()}>View all...</Link>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
+                        <AccordionItem value="status-filter" className="border-b-0">
+                            <AccordionTrigger className="text-sm font-medium hover:no-underline py-2 px-1 rounded hover:bg-muted/50">Status</AccordionTrigger>
+                            <AccordionContent className="pt-2 space-y-2">
+                                 <div className="relative">
+                                    <Input 
+                                        placeholder="Search statuses..." 
+                                        value={statusSearchTerm}
+                                        onChange={(e) => setStatusSearchTerm(e.target.value)}
+                                        className="pl-8 text-xs h-8"
+                                    />
+                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                </div>
+                                <ScrollArea className="h-[100px] pr-3">
+                                    <div className="space-y-1.5">
+                                    {filteredDisplayStatuses.map(status => (
+                                        <div key={status} className="flex items-center space-x-2">
+                                            <Checkbox 
+                                                id={`status-${status}`}
+                                                checked={selectedStatusesInDialog.includes(status)}
+                                                onCheckedChange={() => handleStatusCheckboxChange(status)}
+                                            />
+                                            <Label htmlFor={`status-${status}`} className="text-xs font-normal cursor-pointer">{status}</Label>
+                                        </div>
+                                    ))}
+                                    </div>
+                                </ScrollArea>
+                                 <Link href="#" className="text-xs text-primary hover:underline mt-1 block" onClick={(e) => e.preventDefault()}>View all...</Link>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
                 </div>
+                {/* Footer removed as per request */}
               </DialogContent>
             </Dialog>
 
