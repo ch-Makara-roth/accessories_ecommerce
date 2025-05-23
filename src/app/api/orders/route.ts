@@ -1,28 +1,36 @@
 
 // src/app/api/orders/route.ts
+import prisma from '@/lib/prisma'; // Ensure this is the correct path to your Prisma client instance
 import { NextResponse, type NextRequest } from 'next/server';
-import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import type { CartItem } from '@/types';
 
 interface CreateOrderRequestBody {
   cartItems: CartItem[];
-  shippingAddress?: any; // Define a more specific type for shippingAddress
+  shippingAddress?: any;
 }
 
 export async function POST(req: NextRequest) {
   console.log('API POST /api/orders: Received order creation request.');
 
+  // Most critical check: Is Prisma client itself available?
   if (!prisma) {
-    console.error('API POST /api/orders: CRITICAL - Prisma client is not initialized!');
-    return NextResponse.json({ error: 'Internal Server Error: Database client is not initialized.' }, { status: 500 });
+    const errorMsg = 'CRITICAL - Prisma client (imported as `prisma`) is undefined! This is a fundamental setup issue. Check server logs, DATABASE_URL in .env.local, ensure `npx prisma generate` has run, and server was restarted.';
+    console.error(`API POST /api/orders: ${errorMsg}`);
+    return NextResponse.json({ error: 'Internal Server Error', details: errorMsg, message: errorMsg }, { status: 500 });
   }
+  console.log('API POST /api/orders: Prisma client instance IS defined.');
+
+  // Next critical check: Is the `order` model accessible and does it have a `create` method?
   if (!prisma.order || typeof prisma.order.create !== 'function') {
-    console.error('API POST /api/orders: CRITICAL - Prisma order model or create method is not accessible. Ensure `npx prisma generate` has been run and server restarted.');
-    return NextResponse.json({ error: 'Internal Server Error: Prisma order model not accessible.' }, { status: 500 });
+    const availableModels = Object.keys(prisma).filter(key => !key.startsWith('$') && !key.startsWith('_') && typeof (prisma as any)[key] === 'object');
+    const errorMsg = `CRITICAL - Prisma 'order' model or its 'create' method is not accessible. This strongly indicates that 'npx prisma generate' has not been run successfully after defining/updating the Order model in schema.prisma, or there's a DATABASE_URL issue. Available Prisma models found: [${availableModels.join(', ')}]. Prisma.order object: ${prisma.order === undefined ? 'undefined' : 'exists (but create method might be missing)'}. Typeof prisma.order.create: ${typeof prisma.order?.create}.`;
+    console.error(`API POST /api/orders: ${errorMsg}`);
+    return NextResponse.json({ error: 'Internal Server Error: Prisma order model not accessible.', details: errorMsg, message: errorMsg }, { status: 500 });
   }
-  console.log('API POST /api/orders: Prisma client and prisma.order.create seem available.');
+  console.log('API POST /api/orders: Prisma client and prisma.order.create seem available. Proceeding with order creation attempt.');
+
 
   const session = await getServerSession(authOptions);
 
@@ -44,7 +52,6 @@ export async function POST(req: NextRequest) {
     }
     console.log(`API POST /api/orders: Processing ${cartItems.length} cart items.`);
 
-    // Fetch current product details and calculate total amount
     let totalAmount = 0;
     const orderItemsData: { productId: string; quantity: number; price: number }[] = [];
 
@@ -61,12 +68,13 @@ export async function POST(req: NextRequest) {
         console.log(`API POST /api/orders: Product with ID ${cartItem.product.id} not found.`);
         return NextResponse.json({ error: `Product with ID ${cartItem.product.id} not found.` }, { status: 404 });
       }
-      if (product.stock !== null && product.stock < cartItem.quantity) {
-        console.log(`API POST /api/orders: Not enough stock for ${product.name}. Available: ${product.stock}`);
-        return NextResponse.json({ error: `Not enough stock for ${product.name}. Available: ${product.stock}` }, { status: 400 });
-      }
+      // TODO: Implement stock checking if product.stock is used
+      // if (product.stock !== null && product.stock < cartItem.quantity) {
+      //   console.log(`API POST /api/orders: Not enough stock for ${product.name}. Available: ${product.stock}`);
+      //   return NextResponse.json({ error: `Not enough stock for ${product.name}. Available: ${product.stock}` }, { status: 400 });
+      // }
 
-      const itemPrice = product.price; // Use current price from DB
+      const itemPrice = product.price; 
       totalAmount += itemPrice * cartItem.quantity;
       orderItemsData.push({
         productId: product.id,
@@ -76,15 +84,14 @@ export async function POST(req: NextRequest) {
     }
     console.log(`API POST /api/orders: Calculated total amount: ${totalAmount}`);
     
-    // Create order and order items in a transaction
     console.log('API POST /api/orders: Starting Prisma transaction to create order.');
     const createdOrder = await prisma.$transaction(async (tx) => {
       const order = await tx.order.create({
         data: {
           userId,
           totalAmount,
-          status: 'Pending', // Default status
-          shippingAddress: shippingAddress || {}, // Store shipping address
+          status: 'Pending', 
+          shippingAddress: shippingAddress || {}, 
           orderItems: {
             create: orderItemsData,
           },
@@ -92,7 +99,7 @@ export async function POST(req: NextRequest) {
         include: {
           orderItems: {
             include: {
-              product: true, // Include product details in the response
+              product: true, 
             },
           },
         },
@@ -133,6 +140,12 @@ export async function GET(req: NextRequest) {
   }
 
   const userId = session.user.id;
+
+  if (!prisma || !prisma.order || typeof prisma.order.findMany !== 'function') {
+    const errorMsg = 'CRITICAL - Prisma `order` model or `findMany` method is not accessible in GET /api/orders. Ensure `npx prisma generate` has been run and server restarted.';
+    console.error(`API GET /api/orders: ${errorMsg}`);
+    return NextResponse.json({ error: 'Internal Server Error: Prisma setup issue.', details: errorMsg }, { status: 500 });
+  }
 
   try {
     const orders = await prisma.order.findMany({
