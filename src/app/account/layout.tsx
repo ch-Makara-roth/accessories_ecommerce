@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LayoutDashboard, Package, Bell, Settings, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Package, Bell, Settings, Menu, X, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from '@/components/ui/sheet';
 // Import mock notifications to calculate unread count
 import { mockCustomerNotifications } from '@/app/account/notifications/page';
+import { signOut } from 'next-auth/react'; // Import signOut
 
 interface AccountNavItem {
   href: string;
@@ -73,6 +74,11 @@ export default function AccountLayout({
     </Button>
   ));
 
+  const handleLogout = () => {
+    signOut({ callbackUrl: '/' });
+    setIsSheetOpen(false); // Ensure sheet closes if logout is from mobile menu
+  };
+
   return (
     <div className="flex min-h-[calc(100vh-var(--header-height,0px)-var(--footer-height,0px))] bg-muted/40"> {/* Adjust min-height if header/footer heights are dynamic */}
       {/* Desktop Sidebar */}
@@ -86,8 +92,9 @@ export default function AccountLayout({
           {renderNavItems()}
         </nav>
          <div className="p-4 border-t mt-auto">
-          <Button variant="outline" className="w-full" asChild>
-            <Link href="/">Back to Shop</Link>
+          <Button variant="outline" className="w-full" onClick={handleLogout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
           </Button>
         </div>
       </aside>
@@ -119,8 +126,9 @@ export default function AccountLayout({
                 {renderNavItems()}
               </nav>
               <div className="p-4 border-t mt-auto">
-                <Button variant="outline" className="w-full" asChild>
-                  <Link href="/" onClick={() => setIsSheetOpen(false)}>Back to Shop</Link>
+                <Button variant="outline" className="w-full" onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
                 </Button>
               </div>
             </SheetContent>
