@@ -1,3 +1,4 @@
+
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
@@ -8,6 +9,23 @@ generator client {
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String? // Added for credentials auth
+  accounts      Account[]
+  sessions      Session[]
+  orders        Order[]   // Relation to Order model
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  otps          Otp[] // Relation to Otp model
+
+  @@map("User")
 }
 
 model Account {
@@ -27,7 +45,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
-  @@map("Accounts")
+  @@map("Account")
 }
 
 model Session {
@@ -37,28 +55,11 @@ model Session {
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("Sessions")
-}
-
-model User {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  accounts      Account[]
-  sessions      Session[]
-  otps          Otp[]     @relation("UserOtps")
-  orders        Order[]   // Relation to Orders
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("User")
+  @@map("Session")
 }
 
 model VerificationToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId // Added this line
   identifier String
   token      String   @unique
   expires    DateTime
@@ -73,48 +74,47 @@ model Otp {
   otp       String
   expiresAt DateTime
   userId    String?  @db.ObjectId // Optional: Link OTP to a user if they exist
-  user      User?    @relation("UserOtps", fields: [userId], references: [id], onDelete: Cascade)
-
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([email, otp]) // Ensure OTPs are unique per email, or globally if preferred
-  @@map("Otps")
+  @@unique([email, otp]) // Ensure OTP is unique per email, or just unique globally if preferred
+  @@map("Otp")
 }
 
 model Category {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  name      String   @unique
-  slug      String   @unique
-  products  Product[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  name      String    @unique
+  slug      String    @unique
+  products  Product[] // Relation to Product model
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@map("categories")
 }
 
 model Product {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
-  name          String
-  price         Float
-  originalPrice Float?
-  description   String
-  image         String?
-  type          String?
-  color         String?
-  material      String?
-  offer         String?
-  tags          String[]
-  dataAiHint    String?
-  stock         Int?
-  status        String?   @default("Draft") // e.g., Active, Draft, Archived
-  rating        Float?    @default(0)
-  reviewCount   Int?      @default(0)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  categoryId    String?   @db.ObjectId
-  category      Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  orderItems    OrderItem[] // Relation to OrderItems
+  id              String       @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  description     String
+  price           Float
+  originalPrice   Float?
+  image           String?
+  stock           Int?
+  status          String?      @default("Draft") // e.g., Active, Draft, Archived
+  rating          Float?       @default(0)
+  reviewCount     Int?         @default(0)
+  type            String? // e.g., "Wireless", "Wired"
+  color           String?
+  material        String?
+  offer           String? // e.g., "50% Off"
+  tags            String[]     @default([])
+  dataAiHint      String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  categoryId      String?      @db.ObjectId // Foreign key for the relation
+  category        Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull) // The relation
+  orderItems      OrderItem[]  // Relation to OrderItem model
 
   @@map("accessorice-app")
 }
@@ -124,9 +124,8 @@ model Order {
   userId          String      @db.ObjectId
   user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   totalAmount     Float
-  status          String      @default("Pending") // e.g., Pending, Processing, Shipped, Delivered, Cancelled
-  shippingAddress Json?       // Store as JSON or break into separate fields if structured querying is needed
-  // Example: shippingStreet, shippingCity, shippingZip, shippingCountry
+  status          String // e.g., Pending, Processing, Shipped, Delivered, Cancelled
+  shippingAddress Json? // Or define a separate model/embedded document for address
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   orderItems      OrderItem[]
@@ -139,12 +138,9 @@ model OrderItem {
   orderId   String  @db.ObjectId
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String  @db.ObjectId
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade) // Or Restrict if product deletion shouldn't cascade
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict) // Restrict deletion of product if it's in an order
   quantity  Int
-  price     Float   // Price of the product at the time of order
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  price     Float // Price of the product at the time of order
 
   @@map("OrderItems")
 }
