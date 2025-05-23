@@ -58,23 +58,31 @@ export default function CheckoutPage() {
       return;
     }
     
-    // Basic form validation
+    // Basic form validation (commented out for testing as requested)
+    /*
     for (const key in formData) {
         if (key !== 'phone' && (formData as any)[key].trim() === '') { // phone is optional
              toast({ variant: 'destructive', title: 'Missing Information', description: `Please fill in all required fields. ${key} is missing.` });
              return;
         }
     }
+    */
 
 
     setIsPlacingOrder(true);
     try {
       const orderPayload = {
         cartItems: cartItems.map(item => ({
-          product: { id: item.product.id, name: item.product.name, price: item.product.price, image: item.product.image }, // Send only necessary product info
+          product: { 
+            id: item.product.id, 
+            name: item.product.name, 
+            price: item.product.price, 
+            image: item.product.image,
+            dataAiHint: item.product.dataAiHint 
+          },
           quantity: item.quantity,
         })),
-        shippingAddress: { // Construct shipping address object
+        shippingAddress: { 
             firstName: formData.firstName,
             lastName: formData.lastName,
             address: formData.address,
@@ -83,9 +91,6 @@ export default function CheckoutPage() {
             zip: formData.zip,
             phone: formData.phone,
         },
-        // Payment details are usually handled by a payment gateway on the client-side,
-        // and a token/reference is sent to the backend, not raw card numbers.
-        // For this demo, we are not processing real payments.
       };
 
       const response = await fetch('/api/orders', {
@@ -102,7 +107,7 @@ export default function CheckoutPage() {
 
       toast({
         title: 'Order Placed Successfully!',
-        description: `Your order #${result.id} has been placed.`,
+        description: `Your order #${result.id.substring(0,8)}... has been placed.`,
       });
       clearCart(); 
       router.push(`/account/orders?orderId=${result.id}`); 
@@ -122,7 +127,7 @@ export default function CheckoutPage() {
     return <div className="text-center py-20"><Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" /></div>;
   }
 
-  if (getCartItemCount() === 0 && !isPlacingOrder) { // Don't show if an order was just placed
+  if (getCartItemCount() === 0 && !isPlacingOrder) { 
     return (
       <div className="text-center py-20">
         <h1 className="text-3xl font-bold mb-4 text-primary">Your Cart is Empty</h1>
@@ -147,30 +152,30 @@ export default function CheckoutPage() {
             <CardContent className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="firstName">First Name *</Label>
-                  <Input id="firstName" placeholder="John" value={formData.firstName} onChange={handleInputChange} required/>
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input id="firstName" placeholder="John" value={formData.firstName} onChange={handleInputChange} />
                 </div>
                 <div>
-                  <Label htmlFor="lastName">Last Name *</Label>
-                  <Input id="lastName" placeholder="Doe" value={formData.lastName} onChange={handleInputChange} required/>
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input id="lastName" placeholder="Doe" value={formData.lastName} onChange={handleInputChange} />
                 </div>
               </div>
               <div>
-                <Label htmlFor="address">Address *</Label>
-                <Input id="address" placeholder="123 Main St" value={formData.address} onChange={handleInputChange} required/>
+                <Label htmlFor="address">Address</Label>
+                <Input id="address" placeholder="123 Main St" value={formData.address} onChange={handleInputChange} />
               </div>
               <div className="grid sm:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="city">City *</Label>
-                  <Input id="city" placeholder="Anytown" value={formData.city} onChange={handleInputChange} required/>
+                  <Label htmlFor="city">City</Label>
+                  <Input id="city" placeholder="Anytown" value={formData.city} onChange={handleInputChange} />
                 </div>
                 <div>
-                  <Label htmlFor="state">State *</Label>
-                  <Input id="state" placeholder="CA" value={formData.state} onChange={handleInputChange} required/>
+                  <Label htmlFor="state">State</Label>
+                  <Input id="state" placeholder="CA" value={formData.state} onChange={handleInputChange} />
                 </div>
                 <div>
-                  <Label htmlFor="zip">Zip Code *</Label>
-                  <Input id="zip" placeholder="90210" value={formData.zip} onChange={handleInputChange} required/>
+                  <Label htmlFor="zip">Zip Code</Label>
+                  <Input id="zip" placeholder="90210" value={formData.zip} onChange={handleInputChange} />
                 </div>
               </div>
               <div>
@@ -186,17 +191,17 @@ export default function CheckoutPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="cardNumber">Card Number *</Label>
-                <Input id="cardNumber" placeholder="•••• •••• •••• ••••" value={formData.cardNumber} onChange={handleInputChange} required/>
+                <Label htmlFor="cardNumber">Card Number</Label>
+                <Input id="cardNumber" placeholder="•••• •••• •••• ••••" value={formData.cardNumber} onChange={handleInputChange} />
               </div>
               <div className="grid sm:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="expiryDate">Expiry Date *</Label>
-                  <Input id="expiryDate" placeholder="MM/YY" value={formData.expiryDate} onChange={handleInputChange} required/>
+                  <Label htmlFor="expiryDate">Expiry Date</Label>
+                  <Input id="expiryDate" placeholder="MM/YY" value={formData.expiryDate} onChange={handleInputChange} />
                 </div>
                 <div>
-                  <Label htmlFor="cvc">CVC *</Label>
-                  <Input id="cvc" placeholder="123" value={formData.cvc} onChange={handleInputChange} required/>
+                  <Label htmlFor="cvc">CVC</Label>
+                  <Input id="cvc" placeholder="123" value={formData.cvc} onChange={handleInputChange} />
                 </div>
               </div>
                <div className="flex items-center space-x-2 mt-2">
