@@ -10,16 +10,18 @@ if (!process.env.SENDGRID_API_KEY) {
 }
 
 if (!process.env.FROM_EMAIL) {
-  console.warn('WARNING: FROM_EMAIL is not set in .env.local. Real email sending may fail if FROM_EMAIL is required by your SendGrid setup.');
+  console.warn('WARNING: FROM_EMAIL is not set in .env.local. Real email sending will fail if FROM_EMAIL is not a VERIFIED SENDER IDENTITY in your SendGrid account.');
+} else {
+  console.log(`FROM_EMAIL is set to: ${process.env.FROM_EMAIL}. Ensure this is a verified sender identity in SendGrid.`);
 }
 
 export async function sendOtpEmail(to: string, otp: string): Promise<void> {
   const fromEmail = process.env.FROM_EMAIL;
 
   if (!process.env.SENDGRID_API_KEY || !fromEmail) {
-    console.error('SendGrid API Key or From Email is not configured. Cannot send OTP email.');
+    console.error('CRITICAL: SendGrid API Key or From Email is not configured correctly in .env.local. The FROM_EMAIL must also be a VERIFIED SENDER IDENTITY in SendGrid. Cannot send OTP email.');
     // Log OTP to console as a fallback
-    console.log(`--- OTP FOR ${to} (Email Service Not Fully Configured) ---`);
+    console.log(`--- OTP FOR ${to} (Email Service Not Fully Configured/FROM_EMAIL missing or unverified) ---`);
     console.log(`--- OTP: ${otp}`);
     console.log(`-------------------------------------------------------`);
     return; // Exit if essential configs are missing
@@ -55,6 +57,9 @@ export async function sendOtpEmail(to: string, otp: string): Promise<void> {
       console.error('SendGrid Error Response Status:', error.response.statusCode);
       console.error('SendGrid Error Response Headers:', JSON.stringify(error.response.headers, null, 2));
       console.error('SendGrid Error Response Body:', JSON.stringify(error.response.body, null, 2));
+      if (JSON.stringify(error.response.body).includes("does not match a verified Sender Identity")) {
+        console.error('IMPORTANT: The "FROM_EMAIL" in your .env.local file is not a verified sender in SendGrid. Please verify it in your SendGrid account under Sender Authentication.');
+      }
     } else {
       console.error('SendGrid Error (no response object):', error.message, error);
     }
@@ -62,7 +67,5 @@ export async function sendOtpEmail(to: string, otp: string): Promise<void> {
     console.log(`--- OTP FOR ${to} (SendGrid send FAILED - see error above) ---`);
     console.log(`--- OTP: ${otp}`);
     console.log(`-----------------------------------------------------------`);
-    // Depending on your strategy, you might want to re-throw or handle differently.
-    // For now, we log and let the OTP be available in console for development.
   }
 }
