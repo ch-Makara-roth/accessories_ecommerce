@@ -67,8 +67,8 @@ export default function AdminNotificationsPage() {
     return notifications.map((notification) => {
       const IconComponent = notificationIcons[notification.category] || notificationIcons.Default;
       return (
-        <Card 
-          key={notification.id} 
+        <Card
+          key={notification.id}
           className={`shadow-sm hover:shadow-md transition-shadow rounded-lg ${
             !notification.isRead ? 'border-primary/50 bg-primary/5 dark:bg-primary/10' : 'bg-card'
           }`}
@@ -76,10 +76,10 @@ export default function AdminNotificationsPage() {
           <CardHeader className="pb-3">
             <div className="flex items-start justify-between">
               <div className="flex items-center">
-                <IconComponent 
+                <IconComponent
                   className={`mr-3 h-5 w-5 ${
                     !notification.isRead ? 'text-primary' : 'text-muted-foreground'
-                  }`} 
+                  }`}
                 />
                 <CardTitle className={`text-lg ${!notification.isRead ? 'text-primary' : 'text-card-foreground'}`}>
                   {notification.title}
@@ -96,12 +96,12 @@ export default function AdminNotificationsPage() {
             </CardDescription>
              <div className="mt-3 text-xs">
                 <span className={`px-2 py-0.5 rounded-full font-medium border ${
-                  !notification.isRead 
-                    ? (notification.category === 'Orders' ? 'bg-blue-500/20 border-blue-400 text-blue-100' 
-                      : notification.category === 'Inventory' ? 'bg-yellow-500/20 border-yellow-400 text-yellow-100'
-                      : notification.category === 'Users' ? 'bg-green-500/20 border-green-400 text-green-100'
-                      : 'bg-gray-500/20 border-gray-400 text-gray-100')
-                    : (notification.category === 'Orders' ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/50 dark:border-blue-700 dark:text-blue-300' 
+                  !notification.isRead
+                    ? (notification.category === 'Orders' ? 'bg-primary/10 text-primary border-primary/30 dark:bg-primary/20 dark:text-primary-foreground/80 dark:border-primary/50'
+                      : notification.category === 'Inventory' ? 'bg-yellow-500/20 border-yellow-400 text-yellow-100 dark:bg-yellow-600/20 dark:text-yellow-50 dark:border-yellow-500'
+                      : notification.category === 'Users' ? 'bg-green-500/20 border-green-400 text-green-100 dark:bg-green-600/20 dark:text-green-50 dark:border-green-500'
+                      : 'bg-gray-500/20 border-gray-400 text-gray-100 dark:bg-gray-600/20 dark:text-gray-50 dark:border-gray-500')
+                    : (notification.category === 'Orders' ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/50 dark:border-blue-700 dark:text-blue-300'
                       : notification.category === 'Inventory' ? 'bg-yellow-100 border-yellow-300 text-yellow-700 dark:bg-yellow-900/50 dark:border-yellow-700 dark:text-yellow-300'
                       : notification.category === 'Users' ? 'bg-green-100 border-green-300 text-green-700 dark:bg-green-900/50 dark:border-green-700 dark:text-green-300'
                       : 'bg-gray-100 border-gray-300 text-gray-700 dark:bg-gray-700/50 dark:border-gray-600 dark:text-gray-300')

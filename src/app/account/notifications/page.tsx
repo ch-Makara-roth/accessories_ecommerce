@@ -63,8 +63,8 @@ export default function CustomerNotificationsPage() {
       <div className="space-y-4">
         {mockCustomerNotifications.length > 0 ? (
           mockCustomerNotifications.map((notification) => (
-            <Card 
-              key={notification.id} 
+            <Card
+              key={notification.id}
               className={`shadow-sm hover:shadow-md transition-shadow rounded-lg ${
                 !notification.read ? 'border-primary/50 bg-primary/5 dark:bg-primary/10' : 'bg-card'
               }`}
@@ -72,10 +72,10 @@ export default function CustomerNotificationsPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center">
-                    <notification.icon 
+                    <notification.icon
                       className={`mr-3 h-5 w-5 ${
                         !notification.read ? 'text-primary' : 'text-muted-foreground'
-                      }`} 
+                      }`}
                     />
                     <CardTitle className={`text-lg ${!notification.read ? 'text-primary' : 'text-card-foreground'}`}>
                       {notification.title}
@@ -92,11 +92,11 @@ export default function CustomerNotificationsPage() {
                 </CardDescription>
                  <div className="mt-3 text-xs">
                     <span className={`px-2 py-0.5 rounded-full font-medium border ${
-                        !notification.read 
-                          ? (notification.category === 'Orders' ? 'bg-blue-500/20 border-blue-400 text-blue-100' 
-                            : notification.category === 'Promotions' ? 'bg-purple-500/20 border-purple-400 text-purple-100'
-                            : 'bg-gray-500/20 border-gray-400 text-gray-100')
-                          : (notification.category === 'Orders' ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/50 dark:border-blue-700 dark:text-blue-300' 
+                        !notification.read
+                          ? (notification.category === 'Orders' ? 'bg-primary/10 text-primary border-primary/30 dark:bg-primary/20 dark:text-primary-foreground/80 dark:border-primary/50'
+                            : notification.category === 'Promotions' ? 'bg-purple-500/20 border-purple-400 text-purple-100 dark:bg-purple-600/20 dark:text-purple-50 dark:border-purple-500'
+                            : 'bg-gray-500/20 border-gray-400 text-gray-100 dark:bg-gray-600/20 dark:text-gray-50 dark:border-gray-500')
+                          : (notification.category === 'Orders' ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/50 dark:border-blue-700 dark:text-blue-300'
                             : notification.category === 'Promotions' ? 'bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/50 dark:border-purple-700 dark:text-purple-300'
                             : 'bg-gray-100 border-gray-300 text-gray-700 dark:bg-gray-700/50 dark:border-gray-600 dark:text-gray-300')
                     }`}>
