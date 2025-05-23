@@ -1,7 +1,6 @@
 
 'use client';
 
-import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
   LayoutDashboard,
@@ -12,13 +11,13 @@ import {
   Bell,
   Settings,
   UserCircle,
-  ChevronDown,
   List,
   Shapes,
   Search, 
   Menu, 
   X,
-  LogOut, // Added LogOut icon
+  LogOut,
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -41,8 +40,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, type KeyboardEvent } from 'react';
-import Logo from '@/components/common/Logo'; 
-
+import type { AdminNotification } from '@/types'; // Assuming AdminNotification type
 
 interface AdminNavItem {
   href: string;
@@ -60,10 +58,30 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const mockUnreadNotifications = 3; 
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [adminSearchTerm, setAdminSearchTerm] = useState('');
   const { toast } = useToast();
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const response = await fetch('/api/admin/notifications?unread=true');
+        if (response.ok) {
+          const data: AdminNotification[] = await response.json();
+          setUnreadNotificationsCount(data.length);
+        } else {
+          console.error('Failed to fetch unread notifications count for admin layout');
+        }
+      } catch (error) {
+        console.error('Error fetching unread notifications count for admin layout:', error);
+      }
+    };
+    fetchUnreadCount();
+    // Optionally, set up an interval to poll for new notifications
+    // const intervalId = setInterval(fetchUnreadCount, 30000); // every 30 seconds
+    // return () => clearInterval(intervalId);
+  }, []);
 
   const navItems: AdminNavItem[] = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -84,7 +102,7 @@ export default function AdminLayout({
       href: '/admin/notifications',
       label: 'Notifications',
       icon: Bell,
-      badgeCount: mockUnreadNotifications, 
+      badgeCount: unreadNotificationsCount, 
     },
     { href: '/admin/settings', label: 'Settings', icon: Settings },
   ];
@@ -107,12 +125,10 @@ export default function AdminLayout({
         title: 'Admin Search (Placeholder)',
         description: `Searched for: "${adminSearchTerm}". Implement actual search logic.`,
       });
-      // setIsSearchVisible(false); // Optionally hide after search
-      // setAdminSearchTerm('');
     }
   };
 
-  const renderNavItems = (isMobileSheet: boolean = false) => navItems.map((item) =>
+  const renderNavItems = () => navItems.map((item) =>
     item.isAccordion && item.subItems ? (
       <Accordion key={item.label} type="single" collapsible className="w-full" defaultValue={isActive(item.href, false) ? item.label : undefined}>
         <AccordionItem value={item.label} className="border-b-0">
@@ -221,15 +237,13 @@ export default function AdminLayout({
                    <Link href="/admin" onClick={() => setIsSheetOpen(false)}>
                      <SheetTitle>Admin Menu</SheetTitle>
                    </Link>
-                    <SheetTrigger asChild>
-                       <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => setIsSheetOpen(false)}>
+                    <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => setIsSheetOpen(false)}>
                         <X className="h-5 w-5" />
                         <span className="sr-only">Close menu</span>
-                      </Button>
-                    </SheetTrigger>
+                    </Button>
                 </SheetHeader>
                 <nav className="flex-grow p-4 space-y-2 overflow-y-auto">
-                    {renderNavItems(true)}
+                    {renderNavItems()}
                 </nav>
                  <div className="p-4 border-t mt-auto">
                   <Button variant="outline" className="w-full" onClick={() => { alert('Admin Logout clicked!'); setIsSheetOpen(false); }}>
@@ -241,12 +255,10 @@ export default function AdminLayout({
           </Sheet>
 
           <div className="md:hidden text-xl font-bold text-primary">
-             {/* Can put current page title here if needed, or keep it clean */}
           </div>
 
 
           <div className="flex items-center gap-2 ml-auto">
-            {/* Admin Search Area - visible on sm screens and up */}
             <div className="hidden sm:flex items-center gap-2">
               {isSearchVisible ? (
                 <>
@@ -277,7 +289,6 @@ export default function AdminLayout({
               )}
             </div>
             
-            {/* User Dropdown Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">

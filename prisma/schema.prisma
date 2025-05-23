@@ -1,4 +1,3 @@
-
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
@@ -17,13 +16,14 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  password      String? // Added for credentials auth
+  password      String? // Added for email/password auth
   accounts      Account[]
   sessions      Session[]
-  orders        Order[]   // Relation to Order model
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  otps          Otp[] // Relation to Otp model
+  orders        Order[] // Relation to Order model
+  Otps          Otp[] // Relation to Otp model
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("User")
 }
@@ -44,6 +44,9 @@ model Account {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([provider, providerAccountId])
   @@map("Account")
 }
@@ -55,11 +58,14 @@ model Session {
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("Session")
 }
 
 model VerificationToken {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId // Added this line
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId // Added ID field
   identifier String
   token      String   @unique
   expires    DateTime
@@ -75,48 +81,48 @@ model Otp {
   expiresAt DateTime
   userId    String?  @db.ObjectId // Optional: Link OTP to a user if they exist
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([email, otp]) // Ensure OTP is unique per email, or just unique globally if preferred
-  @@map("Otp")
-}
-
-model Category {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  name      String    @unique
-  slug      String    @unique
-  products  Product[] // Relation to Product model
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@map("categories")
+  @@map("Otps")
 }
 
 model Product {
-  id              String       @id @default(auto()) @map("_id") @db.ObjectId
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
   name            String
   description     String
   price           Float
   originalPrice   Float?
   image           String?
   stock           Int?
-  status          String?      @default("Draft") // e.g., Active, Draft, Archived
-  rating          Float?       @default(0)
-  reviewCount     Int?         @default(0)
+  status          String?   @default("Draft") // e.g., Active, Draft, Archived
+  rating          Float?    @default(0)
+  reviewCount     Int?      @default(0)
   type            String? // e.g., "Wireless", "Wired"
   color           String?
   material        String?
   offer           String? // e.g., "50% Off"
-  tags            String[]     @default([])
-  dataAiHint      String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  categoryId      String?      @db.ObjectId // Foreign key for the relation
-  category        Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull) // The relation
-  orderItems      OrderItem[]  // Relation to OrderItem model
+  tags            String[]  @default([])
+  dataAiHint      String?   @default("product item")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  categoryId      String?   @db.ObjectId
+  category        Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  orderItems      OrderItem[] // Relation to OrderItem model
 
   @@map("accessorice-app")
+}
+
+model Category {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  name      String    @unique
+  slug      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("categories")
 }
 
 model Order {
@@ -125,7 +131,7 @@ model Order {
   user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   totalAmount     Float
   status          String // e.g., Pending, Processing, Shipped, Delivered, Cancelled
-  shippingAddress Json? // Or define a separate model/embedded document for address
+  shippingAddress Json? // Store as JSON or create separate address fields/model
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   orderItems      OrderItem[]
@@ -138,9 +144,21 @@ model OrderItem {
   orderId   String  @db.ObjectId
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String  @db.ObjectId
-  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict) // Restrict deletion of product if it's in an order
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade) // Consider onDelete: Restrict or SetNull based on requirements
   quantity  Int
   price     Float // Price of the product at the time of order
 
   @@map("OrderItems")
+}
+
+model AdminNotification {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+  category    String   // e.g., "New Order", "Low Stock", "User Signup"
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("AdminNotifications")
 }

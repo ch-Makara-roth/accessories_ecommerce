@@ -6,14 +6,14 @@ export type Category = {
   _id?: ObjectId | string; // MongoDB ID, if needed directly
   name: string;
   slug: string;
-  icon?: React.ElementType; // Kept for potential future use, not directly in DB model for now
+  icon?: React.ElementType; 
   createdAt?: Date;
   updatedAt?: Date;
 };
 
 export type Product = {
-  _id?: ObjectId | string; // MongoDB ID
-  id: string; // string version of _id, for client-side use
+  _id?: ObjectId | string; 
+  id: string; 
   name: string;
   price: number;
   originalPrice?: number;
@@ -22,17 +22,17 @@ export type Product = {
   description: string;
   image: string;
   
-  type?: string; // e.g., "Wireless", "Wired"
+  type?: string; 
   color?: string;
   material?: string;
-  offer?: string; // e.g., "50% Off"
+  offer?: string; 
   tags?: string[];
   dataAiHint?: string;
   stock?: number;
-  status?: 'Active' | 'Draft' | 'Archived' | 'Scheduled'; // Added from admin form
+  status?: 'Active' | 'Draft' | 'Archived' | 'Scheduled'; 
 
-  categoryId?: string | null; // Foreign key
-  category?: Category | null; // Nested category object
+  categoryId?: string | null; 
+  category?: Category | null; 
   createdAt?: Date;
   updatedAt?: Date;
 };
@@ -46,9 +46,9 @@ export interface CartItem {
 export type OrderItemType = {
   id: string;
   productId: string;
-  product: Product; // Include product details for display
+  product: Product; 
   quantity: number;
-  price: number; // Price at the time of order
+  price: number; 
   createdAt?: Date;
   updatedAt?: Date;
 };
@@ -58,11 +58,21 @@ export type OrderStatus = "Pending" | "Processing" | "Shipped" | "Delivered" | "
 export type OrderType = {
   id: string;
   userId: string;
-  user?: { name?: string | null; email?: string | null }; // Optional user details
+  user?: { name?: string | null; email?: string | null }; 
   totalAmount: number;
   status: OrderStatus;
-  shippingAddress?: any; // Define a proper type if you have a structured address
+  shippingAddress?: any; 
   createdAt: Date;
   updatedAt: Date;
   orderItems: OrderItemType[];
+};
+
+export type AdminNotification = {
+  id: string;
+  title: string;
+  description: string;
+  category: string; // e.g., "New Order", "Low Stock", "User Signup"
+  isRead: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
 };
