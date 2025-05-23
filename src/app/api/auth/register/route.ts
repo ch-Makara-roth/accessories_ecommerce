@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     console.error('API /api/auth/register: CRITICAL - Prisma client is not initialized!');
     return NextResponse.json({ error: 'Internal Server Error: Database client is not initialized. Check server logs, DATABASE_URL in .env.local, and ensure server was restarted.' }, { status: 500 });
   }
-  if (!prisma.user || typeof prisma.user.create !== 'function' || !prisma.otp || typeof prisma.otp.create !== 'function') {
+  if (!prisma.user || typeof prisma.user.upsert !== 'function' || !prisma.otp || typeof prisma.otp.create !== 'function') {
     const errorMsg = 'Internal Server Error: Prisma models (User/Otp) or their methods are not accessible. Ensure `npx prisma generate` has been run and server restarted.';
     console.error(`API /api/auth/register: CRITICAL - ${errorMsg}. Prisma object: ${JSON.stringify(prisma, Object.getOwnPropertyNames(prisma))}`);
     return NextResponse.json({ error: errorMsg, message: errorMsg }, { status: 500 });
@@ -46,27 +46,20 @@ export async function POST(req: NextRequest) {
       where: { email },
     });
 
-    if (existingUser) {
-      if (existingUser.emailVerified) {
-        return NextResponse.json({ error: 'User with this email already exists and is verified. Please login.' }, { status: 409 });
-      }
-      // If user exists but not verified, allow re-registration to trigger new OTP.
-      // Consider deleting old OTPs for this user or the user record itself if you prefer a clean slate.
-      // For simplicity, we'll overwrite OTP and allow re-triggering verification.
-      console.log(`Registration attempt for existing unverified user: ${email}. Proceeding to generate new OTP.`);
-      // Optionally delete existing user to allow full re-registration.
-      // await prisma.user.delete({ where: { email }});
+    if (existingUser && existingUser.emailVerified) {
+      return NextResponse.json({ error: 'User with this email already exists and is verified. Please login.' }, { status: 409 });
+    }
+    if (existingUser && !existingUser.emailVerified) {
+      console.log(`Registration attempt for existing unverified user: ${email}. Proceeding to generate new OTP and update user data.`);
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const name = `${firstName} ${lastName}`;
 
-    // Upsert user: create if not exists, or update if exists but not verified (though findUnique above handles this)
-    // For this flow, we'll ensure the user exists or is created.
+    // Upsert user: create if not exists, or update if exists but not verified
     const user = await prisma.user.upsert({
       where: { email },
       update: {
-        // Potentially update name or password if re-registering an unverified account
         name,
         password: hashedPassword,
         emailVerified: null, // Ensure it's null if re-registering
@@ -93,9 +86,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Send OTP email
+    // Attempt to send OTP email
     try {
-      await sendOtpEmail(email, otpCode); // This function now handles SendGrid integration
+      await sendOtpEmail(email, otpCode);
       console.log(`Registration OTP for ${email} sent via email. Fallback OTP (also logged if email fails): ${otpCode}`);
     } catch (emailError) {
       // Log email sending error but continue, relying on console OTP for testing if needed
@@ -103,7 +96,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
-      message: 'Registration successful! An OTP has been sent to your email. Please verify to continue. (Check server console for OTP if email is not configured/received).',
+      message: 'Registration successful! An OTP has been sent to your email (Check server console for OTP if email is not configured/received).',
       emailForOtp: email
     }, { status: 201 });
 
