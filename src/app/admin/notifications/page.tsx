@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Bell, AlertTriangle, ShoppingBag, UserPlus, Settings2, Loader2 } from 'lucide-react';
 import { useEffect, useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import type { AdminNotification as AdminNotificationType } from '@/types'; // Assuming you'll add this type
+import type { AdminNotification as AdminNotificationType } from '@/types';
 import { format } from 'date-fns';
 
 const notificationIcons: { [key: string]: React.ElementType } = {
@@ -81,17 +81,17 @@ export default function AdminNotificationsPage() {
                     !notification.isRead ? 'text-primary' : 'text-muted-foreground'
                   }`} 
                 />
-                <CardTitle className={`text-lg ${!notification.isRead ? 'text-primary-foreground' : 'text-card-foreground'}`}>
+                <CardTitle className={`text-lg ${!notification.isRead ? 'text-primary' : 'text-card-foreground'}`}>
                   {notification.title}
                 </CardTitle>
               </div>
-              <span className={`text-xs whitespace-nowrap ${!notification.isRead ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+              <span className={`text-xs whitespace-nowrap ${!notification.isRead ? 'text-primary/90' : 'text-muted-foreground'}`}>
                 {notification.createdAt ? format(new Date(notification.createdAt), 'PPpp') : 'N/A'}
               </span>
             </div>
           </CardHeader>
           <CardContent>
-            <CardDescription className={`${!notification.isRead ? 'text-primary-foreground/90' : 'text-muted-foreground'}`}>
+            <CardDescription className={`${!notification.isRead ? 'text-foreground' : 'text-muted-foreground'}`}>
               {notification.description}
             </CardDescription>
              <div className="mt-3 text-xs">

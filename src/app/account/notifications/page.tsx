@@ -77,17 +77,17 @@ export default function CustomerNotificationsPage() {
                         !notification.read ? 'text-primary' : 'text-muted-foreground'
                       }`} 
                     />
-                    <CardTitle className={`text-lg ${!notification.read ? 'text-primary-foreground' : 'text-card-foreground'}`}>
+                    <CardTitle className={`text-lg ${!notification.read ? 'text-primary' : 'text-card-foreground'}`}>
                       {notification.title}
                     </CardTitle>
                   </div>
-                  <span className={`text-xs whitespace-nowrap ${!notification.read ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                  <span className={`text-xs whitespace-nowrap ${!notification.read ? 'text-primary/90' : 'text-muted-foreground'}`}>
                     {notification.time}
                   </span>
                 </div>
               </CardHeader>
               <CardContent>
-                <CardDescription className={`${!notification.read ? 'text-primary-foreground/90' : 'text-muted-foreground'}`}>
+                <CardDescription className={`${!notification.read ? 'text-foreground' : 'text-muted-foreground'}`}>
                   {notification.description}
                 </CardDescription>
                  <div className="mt-3 text-xs">
