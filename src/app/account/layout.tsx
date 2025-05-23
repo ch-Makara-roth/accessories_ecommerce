@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { LayoutDashboard, Package, Bell, Settings, Menu, X, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation'; // Added useRouter
 import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from '@/components/ui/sheet';
-// Import mock notifications to calculate unread count
 import { mockCustomerNotifications } from '@/app/account/notifications/page';
-import { signOut } from 'next-auth/react'; // Import signOut
+import { signOut, useSession } from 'next-auth/react'; // Import useSession
+import { Role } from '@prisma/client'; // Import Role
 
 interface AccountNavItem {
   href: string;
@@ -25,6 +25,8 @@ export default function AccountLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter(); // Initialize useRouter
+  const { data: session, status } = useSession(); // Get session status
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const unreadNotificationsCount = mockCustomerNotifications.filter(n => !n.read).length;
@@ -36,12 +38,32 @@ export default function AccountLayout({
     { href: '/account/settings', label: 'Settings', icon: Settings },
   ];
 
+  useEffect(() => {
+    if (status === 'loading') return; // Do nothing while session is loading
+
+    if (status === 'unauthenticated') {
+      router.push('/auth'); // Redirect unauthenticated users to login
+    } else if (status === 'authenticated') {
+      // If user is authenticated, check their role
+      const userRole = session?.user?.role;
+      if (userRole && userRole !== Role.CUSTOMER) {
+        // If not a customer, redirect them appropriately
+        if ([Role.ADMIN, Role.SELLER, Role.STOCK].includes(userRole)) {
+          router.push('/admin'); // Admin-like roles go to admin panel
+        } else {
+          router.push('/'); // Other roles (if any) go to homepage
+        }
+      }
+      // If role is CUSTOMER, they are allowed to stay on /account pages
+    }
+  }, [session, status, router]);
+
+
   const isActive = (href: string) => {
     return pathname === href;
   };
   
   useEffect(() => {
-    // Close sheet on route change
     setIsSheetOpen(false);
   }, [pathname]);
 
@@ -76,12 +98,29 @@ export default function AccountLayout({
 
   const handleLogout = () => {
     signOut({ callbackUrl: '/' });
-    setIsSheetOpen(false); // Ensure sheet closes if logout is from mobile menu
+    setIsSheetOpen(false); 
   };
+  
+  // Show loading state or null if redirecting
+  if (status === 'loading' || (status === 'authenticated' && session?.user?.role !== Role.CUSTOMER)) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (status === 'unauthenticated') {
+     return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p>Redirecting to login...</p>
+        <Loader2 className="ml-2 h-5 w-5 animate-spin text-primary" />
+      </div>
+    );
+  }
+
 
   return (
-    <div className="flex min-h-[calc(100vh-var(--header-height,0px)-var(--footer-height,0px))] bg-muted/40"> {/* Adjust min-height if header/footer heights are dynamic */}
-      {/* Desktop Sidebar */}
+    <div className="flex min-h-[calc(100vh-var(--header-height,0px)-var(--footer-height,0px))] bg-muted/40">
       <aside className="sticky top-0 h-screen w-60 bg-background border-r hidden md:flex flex-col">
         <div className="flex items-center justify-center h-16 border-b px-6">
           <Link href="/account" className="text-xl font-bold text-primary">
@@ -100,7 +139,6 @@ export default function AccountLayout({
       </aside>
 
       <div className="flex-1 flex flex-col">
-         {/* Mobile Header with Menu Trigger */}
         <header className="sticky top-0 h-16 flex items-center justify-between bg-background border-b px-4 md:hidden">
           <Link href="/account" className="text-xl font-bold text-primary">
             My Account

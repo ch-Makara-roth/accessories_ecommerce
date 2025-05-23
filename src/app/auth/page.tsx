@@ -10,8 +10,9 @@ import { useState, type FormEvent, useEffect, Suspense } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { ShieldCheck, Chrome, Facebook, Mail, KeyRound, Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signIn, useSession } from 'next-auth/react';
+import { signIn, useSession, getSession } from 'next-auth/react'; // Added getSession
 import { useToast } from '@/hooks/use-toast';
+import { Role } from '@prisma/client'; // Added Role
 
 type AuthStep = 'login' | 'signup' | 'otpVerification';
 
@@ -51,71 +52,87 @@ function AuthPageContent() {
 
   useEffect(() => {
     const errorParam = searchParams.get('error');
-    const emailFromUrl = searchParams.get('email'); // For pre-filling if needed
+    const emailFromUrl = searchParams.get('email');
 
     if (errorParam) {
       let description = errorParam;
       let title = 'Login Failed';
+      let shouldShowToast = true;
 
-      if (errorParam === 'CredentialsSignin') {
-        description = 'Invalid email or password.';
-      } else if (errorParam.includes('Email not verified')) {
+      if (errorParam.toLowerCase().includes('email not verified')) {
         title = 'Email Verification Required';
-        description = errorParam; // Use the detailed message from server
-        const attemptEmail = emailFromUrl || loginEmail;
+        description = errorParam;
+        const attemptEmail = emailFromUrl || loginEmail || signupEmail; // Use signupEmail as fallback
         if (attemptEmail) {
           setOtpTargetEmail(attemptEmail);
           setAuthStep('otpVerification');
-          // Avoid showing generic error toast if we are transitioning to OTP UI
-          if (!description.startsWith('Email not verified')) {
-             toast({ variant: 'destructive', title, description });
-          }
-        } else {
-           toast({ variant: 'destructive', title, description });
+          shouldShowToast = false; // Don't show toast if transitioning to OTP UI
         }
-      } else {
-         toast({ variant: 'destructive', title, description });
+      } else if (errorParam === 'AccessDeniedAdmin') {
+        title = 'Access Denied';
+        description = 'You do not have permission to access the admin panel.';
+      } else if (errorParam === 'CredentialsSignin') {
+        description = 'Invalid email or password.';
       }
-      // Clean up URL
+      
+      if (shouldShowToast) {
+        toast({ variant: 'destructive', title, description });
+      }
+
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('error');
       newUrl.searchParams.delete('callbackUrl');
       newUrl.searchParams.delete('email');
       router.replace(newUrl.pathname + newUrl.search, { scroll: false });
     }
-  }, [searchParams, toast, router, loginEmail]);
+  }, [searchParams, toast, router, loginEmail, signupEmail]);
 
 
   if (status === 'authenticated') {
-    router?.push('/account');
-    return <AuthPageFallback />;
-  }
-  if (status === 'loading' && !searchParams.get('error')) {
+     // If already authenticated, redirect based on role
+    if (session?.user?.role) {
+      const userRole = session.user.role;
+      if ([Role.ADMIN, Role.SELLER, Role.STOCK].includes(userRole)) {
+        router.replace('/admin');
+        return <AuthPageFallback />;
+      } else if (userRole === Role.CUSTOMER) {
+        router.replace('/account');
+        return <AuthPageFallback />;
+      }
+    }
+    // Fallback if role is not yet determined or for some other reason
+    router.replace('/'); 
     return <AuthPageFallback />;
   }
 
-  const handleAdminLogin = () => {
-    // For demo, direct redirect. In real app, this would be a separate login form/logic
-    router.push('/admin');
-  };
+  if (status === 'loading' && !searchParams.get('error')) {
+    return <AuthPageFallback />;
+  }
 
   const handleCustomerEmailLogin = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     const result = await signIn('credentials', {
-      redirect: false, // Handle redirect manually to check for errors
+      redirect: false,
       email: loginEmail,
       password: loginPassword,
-      // callbackUrl: `/auth?email=${encodeURIComponent(loginEmail)}` // Pass email for OTP flow
     });
 
     if (result?.error) {
-      // The useEffect for searchParams will handle displaying the toast and OTP transition
-      // by checking the error in the URL. We just need to push it there.
       router.push(`/auth?error=${encodeURIComponent(result.error)}&email=${encodeURIComponent(loginEmail)}`);
     } else if (result?.ok) {
-      toast({ title: 'Login Successful!', description: 'Redirecting to your account...' });
-      router.push('/account'); // Successful login
+      const updatedSession = await getSession(); // Fetch session to get the role
+      toast({ title: 'Login Successful!', description: 'Redirecting...' });
+      if (updatedSession?.user?.role) {
+        const userRole = updatedSession.user.role;
+        if ([Role.ADMIN, Role.SELLER, Role.STOCK].includes(userRole)) {
+          router.push('/admin');
+        } else {
+          router.push('/account');
+        }
+      } else {
+        router.push('/account'); // Default to account if role isn't immediately available
+      }
     }
     setIsLoading(false);
   };
@@ -136,13 +153,12 @@ function AuthPageContent() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to register.');
+        throw new Error(data.error || data.details || 'Failed to register.');
       }
-      toast({ title: 'Registration Pending Verification', description: data.message });
-      setOtpTargetEmail(data.emailForOtp);
+      toast({ title: 'Registration Pending Verification', description: data.message + " (OTP logged to server console for testing)." });
+      setOtpTargetEmail(data.emailForOtp || signupEmail);
       setAuthStep('otpVerification');
-      // Clear signup form fields
-      setSignupFirstName(''); setSignupLastName(''); setSignupEmail(''); setSignupPassword('');
+      setSignupFirstName(''); setSignupLastName(''); setSignupPassword(''); // Keep signupEmail for OTP target
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -164,13 +180,12 @@ function AuthPageContent() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to verify OTP.');
+        throw new Error(data.error || data.details || 'Failed to verify OTP.');
       }
       toast({ title: 'Email Verified!', description: 'Your email has been verified. Please log in.' });
       setAuthStep('login');
-      setLoginEmail(otpTargetEmail); // Pre-fill login email
+      setLoginEmail(otpTargetEmail); 
       setOtpCode('');
-      // setOtpTargetEmail(''); // Keep otpTargetEmail if needed for resend, or clear if login is next
     } catch (error) {
       toast({ variant: 'destructive', title: 'OTP Verification Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.' });
     }
@@ -191,14 +206,21 @@ function AuthPageContent() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to resend OTP.');
+        throw new Error(data.error || data.details || 'Failed to resend OTP.');
       }
-      toast({ title: 'OTP Resent', description: 'A new OTP has been sent to your email (and logged to console for testing).' });
+      toast({ title: 'OTP Resent', description: data.message + " (Check server console for OTP)." });
     } catch (error) {
        toast({ variant: 'destructive', title: 'OTP Resend Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.' });
     }
     setIsResendingOtp(false);
   };
+  
+  const handleAdminLoginRedirect = () => {
+    // This button is a direct redirect. Actual admin login would ideally be via a separate flow
+    // or by logging in with credentials that have an Admin role, then being redirected by the logic above.
+    router.push('/admin');
+  };
+
 
   const renderLogin = () => (
     <Card>
@@ -225,7 +247,7 @@ function AuthPageContent() {
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? <Loader2 className="animate-spin" /> : 'Login'}
           </Button>
-          <Button type="button" variant="outline" className="w-full mt-2" onClick={() => signIn('google', { callbackUrl: '/account' })} disabled={isLoading}>
+          <Button type="button" variant="outline" className="w-full mt-2" onClick={() => signIn('google', { callbackUrl: '/auth/callback-handler' })} disabled={isLoading}>
             <Chrome className="mr-2 h-4 w-4" /> Login with Google
           </Button>
           <Button type="button" variant="outline" className="w-full mt-2" onClick={() => alert('Facebook login not implemented yet.')} disabled={isLoading}>
@@ -249,7 +271,7 @@ function AuthPageContent() {
       <form onSubmit={handleCustomerSignup}>
         <CardHeader>
           <CardTitle className="text-2xl">Customer Sign Up</CardTitle>
-          <CardDescription>Create your customer account. You will need to verify your email with an OTP.</CardDescription>
+          <CardDescription>Create your customer account. You will need to verify your email.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -272,9 +294,9 @@ function AuthPageContent() {
           </div>
             <Separator className="my-4" />
             <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? <Loader2 className="animate-spin" /> : 'Create account & Get OTP'}
+            {isLoading ? <Loader2 className="animate-spin" /> : 'Create account & Verify Email'}
           </Button>
-          <Button type="button" variant="outline" className="w-full mt-2" onClick={() => signIn('google', { callbackUrl: '/account' })} disabled={isLoading}>
+          <Button type="button" variant="outline" className="w-full mt-2" onClick={() => signIn('google', { callbackUrl: '/auth/callback-handler' })} disabled={isLoading}>
             <Chrome className="mr-2 h-4 w-4" /> Sign up with Google
           </Button>
           <Button type="button" variant="outline" className="w-full mt-2" onClick={() => alert('Facebook signup not implemented yet.')} disabled={isLoading}>
@@ -299,7 +321,7 @@ function AuthPageContent() {
         <CardHeader>
           <CardTitle className="text-2xl">Verify Your Email</CardTitle>
           <CardDescription>
-            An OTP has been sent to <span className="font-semibold">{otpTargetEmail}</span> (and logged to server console for testing).
+            An OTP should be sent to <span className="font-semibold">{otpTargetEmail}</span> (and logged to server console for testing).
             Enter it below to verify your email address.
           </CardDescription>
         </CardHeader>
@@ -360,7 +382,7 @@ function AuthPageContent() {
                     </p>
                     </CardContent>
                     <CardFooter>
-                    <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleAdminLogin} disabled={isLoading}>
+                    <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleAdminLoginRedirect} disabled={isLoading}>
                         Login as Admin
                     </Button>
                     </CardFooter>
