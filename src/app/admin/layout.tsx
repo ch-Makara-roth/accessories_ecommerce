@@ -38,12 +38,12 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
+import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, type KeyboardEvent } from 'react';
 import type { AdminNotification } from '@/types';
-import { useSession, signOut } from 'next-auth/react'; // Import useSession and signOut
-import { Loader2 } from 'lucide-react'; // For loading state
-import type { Role } from '@prisma/client'; // Import Role enum from Prisma
+import { useSession, signOut } from 'next-auth/react';
+import { Loader2 } from 'lucide-react';
+import { Role } from '@prisma/client'; // Correctly import Role enum
 
 interface AdminNavItem {
   href: string;
@@ -61,8 +61,8 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter(); // For redirecting
-  const { data: session, status } = useSession(); // Get session data and status
+  const router = useRouter();
+  const { data: session, status } = useSession();
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [adminSearchTerm, setAdminSearchTerm] = useState('');
@@ -73,15 +73,15 @@ export default function AdminLayout({
   const allowedAdminRoles: Role[] = [Role.ADMIN, Role.SELLER, Role.STOCK];
 
   useEffect(() => {
-    if (status === 'loading') return; // Do nothing while loading
+    if (status === 'loading') return; 
     if (status === 'unauthenticated' || !session || !userRole || !allowedAdminRoles.includes(userRole)) {
-      router.push('/auth?error=AccessDeniedAdmin'); // Redirect to auth page or an unauthorized page
+      router.push('/auth?error=AccessDeniedAdmin'); 
     }
   }, [session, status, userRole, router]);
 
 
   useEffect(() => {
-    if (!session || !userRole || !allowedAdminRoles.includes(userRole)) return; // Don't fetch if user not authorized
+    if (!session || !userRole || !allowedAdminRoles.includes(userRole)) return;
 
     const fetchUnreadCount = async () => {
       try {
@@ -110,7 +110,7 @@ export default function AdminLayout({
         { href: '/admin/products', label: 'Product List', icon: List, allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK] },
         { href: '/admin/products/categories', label: 'Categories', icon: Shapes, allowedRoles: [Role.ADMIN, Role.SELLER] },
       ],
-      allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK], // Parent item role
+      allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK], 
     },
     { href: '/admin/sales', label: 'Sales', icon: DollarSign, allowedRoles: [Role.ADMIN, Role.SELLER] },
     { href: '/admin/users', label: 'Customers', icon: Users, allowedRoles: [Role.ADMIN] },
@@ -143,16 +143,17 @@ export default function AdminLayout({
         title: 'Admin Search (Placeholder)',
         description: `Searched for: "${adminSearchTerm}". Implement actual search logic.`,
       });
+      // In a real app: router.push(`/admin/search?q=${adminSearchTerm}`);
     }
   };
   
   const handleLogout = () => {
-    signOut({ callbackUrl: '/' }); // Redirect to homepage after logout
+    signOut({ callbackUrl: '/' }); 
     setIsSheetOpen(false);
   };
 
   const renderNavItems = () => navItems
-    .filter(item => userRole && item.allowedRoles.includes(userRole)) // Filter based on role
+    .filter(item => userRole && item.allowedRoles.includes(userRole)) 
     .map((item) =>
     item.isAccordion && item.subItems ? (
       <Accordion key={item.label} type="single" collapsible className="w-full" defaultValue={isActive(item.href, false) ? item.label : undefined}>
@@ -175,7 +176,7 @@ export default function AdminLayout({
           <AccordionContent className="pt-1 pb-0 pl-4">
             <div className="space-y-1">
             {item.subItems
-              .filter(subItem => userRole && subItem.allowedRoles.includes(userRole)) // Filter sub-items
+              .filter(subItem => userRole && subItem.allowedRoles.includes(userRole)) 
               .map((subItem) => (
               <Button
                 key={subItem.label}
@@ -238,8 +239,6 @@ export default function AdminLayout({
   }
 
   if (!session || !userRole || !allowedAdminRoles.includes(userRole)) {
-    // This case should be handled by the useEffect redirect,
-    // but as a fallback or if redirect hasn't happened yet:
     return (
          <div className="flex justify-center items-center min-h-screen bg-muted/40">
             <p className="text-lg text-destructive">Access Denied. Redirecting...</p>
