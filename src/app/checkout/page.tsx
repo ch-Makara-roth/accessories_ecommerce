@@ -8,25 +8,121 @@ import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
-import { useRouter } from 'next/navigation'; // For redirecting
-import { MinusCircle, PlusCircle, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { MinusCircle, PlusCircle, Trash2, Loader2 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 
 export default function CheckoutPage() {
   const { cartItems, getCartTotal, getCartItemCount, clearCart, updateQuantity, removeFromCart } = useCart();
   const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
+  const { toast } = useToast();
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
-  const shipping = 0.00; // Example free shipping
+  const shipping = 0.00; 
   const subtotal = getCartTotal();
   const total = subtotal + shipping;
 
-  const handlePlaceOrder = () => {
-    // In a real app, this would submit to a backend
-    alert('Order Placed! (This is a demo)');
-    clearCart(); // Clear cart after "placing order"
-    router.push('/'); // Redirect to homepage
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    address: '',
+    city: '',
+    state: '',
+    zip: '',
+    phone: '',
+    cardNumber: '',
+    expiryDate: '',
+    cvc: ''
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.id]: e.target.value });
   };
 
-  if (getCartItemCount() === 0) {
+  const handlePlaceOrder = async () => {
+    if (sessionStatus === 'unauthenticated' || !session?.user) {
+      toast({
+        variant: 'destructive',
+        title: 'Authentication Required',
+        description: 'Please log in to place an order.',
+      });
+      router.push('/auth?callbackUrl=/checkout');
+      return;
+    }
+
+    if (getCartItemCount() === 0) {
+      toast({ variant: 'destructive', title: 'Empty Cart', description: 'Your cart is empty.'});
+      return;
+    }
+    
+    // Basic form validation
+    for (const key in formData) {
+        if (key !== 'phone' && (formData as any)[key].trim() === '') { // phone is optional
+             toast({ variant: 'destructive', title: 'Missing Information', description: `Please fill in all required fields. ${key} is missing.` });
+             return;
+        }
+    }
+
+
+    setIsPlacingOrder(true);
+    try {
+      const orderPayload = {
+        cartItems: cartItems.map(item => ({
+          product: { id: item.product.id, name: item.product.name, price: item.product.price, image: item.product.image }, // Send only necessary product info
+          quantity: item.quantity,
+        })),
+        shippingAddress: { // Construct shipping address object
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            address: formData.address,
+            city: formData.city,
+            state: formData.state,
+            zip: formData.zip,
+            phone: formData.phone,
+        },
+        // Payment details are usually handled by a payment gateway on the client-side,
+        // and a token/reference is sent to the backend, not raw card numbers.
+        // For this demo, we are not processing real payments.
+      };
+
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderPayload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to place order.');
+      }
+
+      toast({
+        title: 'Order Placed Successfully!',
+        description: `Your order #${result.id} has been placed.`,
+      });
+      clearCart(); 
+      router.push(`/account/orders?orderId=${result.id}`); 
+    } catch (error) {
+      console.error('Error placing order:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Order Placement Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+      });
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
+
+  if (sessionStatus === 'loading') {
+    return <div className="text-center py-20"><Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" /></div>;
+  }
+
+  if (getCartItemCount() === 0 && !isPlacingOrder) { // Don't show if an order was just placed
     return (
       <div className="text-center py-20">
         <h1 className="text-3xl font-bold mb-4 text-primary">Your Cart is Empty</h1>
@@ -51,35 +147,35 @@ export default function CheckoutPage() {
             <CardContent className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" placeholder="John" required/>
+                  <Label htmlFor="firstName">First Name *</Label>
+                  <Input id="firstName" placeholder="John" value={formData.firstName} onChange={handleInputChange} required/>
                 </div>
                 <div>
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" placeholder="Doe" required/>
+                  <Label htmlFor="lastName">Last Name *</Label>
+                  <Input id="lastName" placeholder="Doe" value={formData.lastName} onChange={handleInputChange} required/>
                 </div>
               </div>
               <div>
-                <Label htmlFor="address">Address</Label>
-                <Input id="address" placeholder="123 Main St" required/>
+                <Label htmlFor="address">Address *</Label>
+                <Input id="address" placeholder="123 Main St" value={formData.address} onChange={handleInputChange} required/>
               </div>
               <div className="grid sm:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="city">City</Label>
-                  <Input id="city" placeholder="Anytown" required/>
+                  <Label htmlFor="city">City *</Label>
+                  <Input id="city" placeholder="Anytown" value={formData.city} onChange={handleInputChange} required/>
                 </div>
                 <div>
-                  <Label htmlFor="state">State</Label>
-                  <Input id="state" placeholder="CA" required/>
+                  <Label htmlFor="state">State *</Label>
+                  <Input id="state" placeholder="CA" value={formData.state} onChange={handleInputChange} required/>
                 </div>
                 <div>
-                  <Label htmlFor="zip">Zip Code</Label>
-                  <Input id="zip" placeholder="90210" required/>
+                  <Label htmlFor="zip">Zip Code *</Label>
+                  <Input id="zip" placeholder="90210" value={formData.zip} onChange={handleInputChange} required/>
                 </div>
               </div>
               <div>
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input id="phone" type="tel" placeholder="(555) 123-4567" />
+                <Label htmlFor="phone">Phone Number (Optional)</Label>
+                <Input id="phone" type="tel" placeholder="(555) 123-4567" value={formData.phone} onChange={handleInputChange} />
               </div>
             </CardContent>
           </Card>
@@ -90,21 +186,20 @@ export default function CheckoutPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="cardNumber">Card Number</Label>
-                <Input id="cardNumber" placeholder="•••• •••• •••• ••••" required/>
+                <Label htmlFor="cardNumber">Card Number *</Label>
+                <Input id="cardNumber" placeholder="•••• •••• •••• ••••" value={formData.cardNumber} onChange={handleInputChange} required/>
               </div>
               <div className="grid sm:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="expiryDate">Expiry Date</Label>
-                  <Input id="expiryDate" placeholder="MM/YY" required/>
+                  <Label htmlFor="expiryDate">Expiry Date *</Label>
+                  <Input id="expiryDate" placeholder="MM/YY" value={formData.expiryDate} onChange={handleInputChange} required/>
                 </div>
                 <div>
-                  <Label htmlFor="cvc">CVC</Label>
-                  <Input id="cvc" placeholder="123" required/>
+                  <Label htmlFor="cvc">CVC *</Label>
+                  <Input id="cvc" placeholder="123" value={formData.cvc} onChange={handleInputChange} required/>
                 </div>
               </div>
                <div className="flex items-center space-x-2 mt-2">
-                {/* Placeholder for payment icons */}
                 <span className="text-sm">We accept:</span>
                 <div className="border border-border rounded px-2 py-1 text-xs text-muted-foreground">Visa</div>
                 <div className="border border-border rounded px-2 py-1 text-xs text-muted-foreground">Mastercard</div>
@@ -121,7 +216,7 @@ export default function CheckoutPage() {
               <CardTitle className="text-xl">Order Summary</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="max-h-80 overflow-y-auto space-y-4 mb-4 pr-2"> {/* Increased max-h */}
+              <div className="max-h-80 overflow-y-auto space-y-4 mb-4 pr-2">
                 {cartItems.map(item => (
                   <div key={item.product.id} className="flex flex-col space-y-3 pb-3 border-b last:border-b-0">
                     <div className="flex items-start space-x-3">
@@ -176,7 +271,13 @@ export default function CheckoutPage() {
               </div>
             </CardContent>
             <CardFooter className="flex-col space-y-3">
-              <Button size="lg" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={handlePlaceOrder}>
+              <Button 
+                size="lg" 
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90" 
+                onClick={handlePlaceOrder}
+                disabled={isPlacingOrder || sessionStatus === 'loading'}
+              >
+                {isPlacingOrder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Place Order
               </Button>
               <Button variant="outline" className="w-full" asChild>

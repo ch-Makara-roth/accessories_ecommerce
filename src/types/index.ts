@@ -33,6 +33,8 @@ export type Product = {
 
   categoryId?: string | null; // Foreign key
   category?: Category | null; // Nested category object
+  createdAt?: Date;
+  updatedAt?: Date;
 };
 
 
@@ -40,3 +42,27 @@ export interface CartItem {
   product: Product;
   quantity: number;
 }
+
+export type OrderItemType = {
+  id: string;
+  productId: string;
+  product: Product; // Include product details for display
+  quantity: number;
+  price: number; // Price at the time of order
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
+export type OrderStatus = "Pending" | "Processing" | "Shipped" | "Delivered" | "Cancelled";
+
+export type OrderType = {
+  id: string;
+  userId: string;
+  user?: { name?: string | null; email?: string | null }; // Optional user details
+  totalAmount: number;
+  status: OrderStatus;
+  shippingAddress?: any; // Define a proper type if you have a structured address
+  createdAt: Date;
+  updatedAt: Date;
+  orderItems: OrderItemType[];
+};
