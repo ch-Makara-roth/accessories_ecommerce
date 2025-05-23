@@ -1,5 +1,5 @@
 
-'use client'; // Converted to client component for client-side data fetching
+'use client'; 
 
 import HomePageLayout from '@/components/layouts/HomePageLayout';
 import PromotionalBanner from '@/components/home/PromotionalBanner';
@@ -14,7 +14,7 @@ import Link from 'next/link';
 
 
 export default function Home() {
-  const [headphoneProducts, setHeadphoneProducts] = useState<Product[]>([]);
+  const [homepageProducts, setHomepageProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -23,15 +23,16 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/products?categorySlug=headphones&limit=8`); // Fetch 8 headphones
+      // Fetch all products (limited to 8 for the homepage)
+      const res = await fetch(`/api/products?limit=8`); 
       if (!res.ok) {
         const errorBody = await res.text();
-        const errorMessage = `Failed to fetch products for homepage. Status: ${res.status} ${res.statusText}. URL: /api/products?categorySlug=headphones. Body: ${errorBody.substring(0, 200)}...`;
+        const errorMessage = `Failed to fetch products for homepage. Status: ${res.status} ${res.statusText}. URL: /api/products?limit=8. Body: ${errorBody.substring(0, 200)}...`;
         console.error(errorMessage);
         throw new Error('Could not load products for the homepage.');
       }
       const data = await res.json();
-      setHeadphoneProducts(data.products || []);
+      setHomepageProducts(data.products || []);
     } catch (err) {
       console.error("Error fetching homepage products:", err);
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -61,11 +62,11 @@ export default function Home() {
           <p className="mb-4">Could not load products: {error}</p>
            <Button onClick={fetchHomepageProducts}>Try Again</Button>
         </div>
-      ) : headphoneProducts.length > 0 ? (
-        <ProductGrid products={headphoneProducts} />
+      ) : homepageProducts.length > 0 ? (
+        <ProductGrid products={homepageProducts} />
       ) : (
         <div className="text-center py-10">
-            <p className="text-xl text-muted-foreground mb-6">No headphones found at the moment.</p>
+            <p className="text-xl text-muted-foreground mb-6">No products found at the moment.</p>
             <Button asChild>
                 <Link href="/category/all">Explore All Products</Link>
             </Button>
