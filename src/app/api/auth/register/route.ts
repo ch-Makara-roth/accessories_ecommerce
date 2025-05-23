@@ -87,16 +87,17 @@ export async function POST(req: NextRequest) {
     });
 
     // Attempt to send OTP email
+    console.log(`Generated OTP for ${email} during registration: ${otpCode}. Attempting to send email...`);
     try {
-      await sendOtpEmail(email, otpCode);
-      console.log(`Registration OTP for ${email} sent via email. Fallback OTP (also logged if email fails): ${otpCode}`);
+      await sendOtpEmail(email, otpCode); // Await the email sending
+      console.log(`Registration OTP email process initiated for ${email}. Check console for SendGrid logs or fallback OTP.`);
     } catch (emailError) {
       // Log email sending error but continue, relying on console OTP for testing if needed
-      console.error(`Failed to send registration OTP email to ${email}, but OTP is generated and logged: ${otpCode}`, emailError);
+      console.error(`Failed to send registration OTP email to ${email}. OTP is still generated and logged: ${otpCode}. Error:`, emailError);
     }
 
     return NextResponse.json({
-      message: 'Registration successful! An OTP has been sent to your email (Check server console for OTP if email is not configured/received).',
+      message: 'Registration successful! An OTP should be sent to your email. (Check server console for OTP if email is not received).',
       emailForOtp: email
     }, { status: 201 });
 
@@ -108,7 +109,6 @@ export async function POST(req: NextRequest) {
         errorMessage = error.message;
         errorDetails = error.stack || error.message;
     }
-    // Ensure a JSON response is sent for errors
     return NextResponse.json({ error: 'Failed to register user', details: errorMessage, debug: errorDetails }, { status: 500 });
   }
 }

@@ -3,31 +3,31 @@
 import sgMail from '@sendgrid/mail';
 
 if (!process.env.SENDGRID_API_KEY) {
-  console.warn('SENDGRID_API_KEY is not set. Email sending will be disabled.');
+  console.warn('WARNING: SENDGRID_API_KEY is not set in .env.local. Real email sending will be disabled. OTPs will only be logged to the console.');
 } else {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  console.log('SendGrid API Key loaded.');
 }
 
 if (!process.env.FROM_EMAIL) {
-  console.warn('FROM_EMAIL is not set for sending emails.');
+  console.warn('WARNING: FROM_EMAIL is not set in .env.local. Real email sending may fail if FROM_EMAIL is required by your SendGrid setup.');
 }
 
 export async function sendOtpEmail(to: string, otp: string): Promise<void> {
-  if (!process.env.SENDGRID_API_KEY || !process.env.FROM_EMAIL) {
+  const fromEmail = process.env.FROM_EMAIL;
+
+  if (!process.env.SENDGRID_API_KEY || !fromEmail) {
     console.error('SendGrid API Key or From Email is not configured. Cannot send OTP email.');
-    // Log OTP to console as a fallback during development if SendGrid is not configured
-    console.log(`--- OTP FOR ${to} (SendGrid not configured) ---`);
-    console.log(`OTP: ${otp}`);
-    console.log(`-------------------------------------------------`);
-    // Optionally, you could throw an error here or return a status
-    // For now, to avoid breaking the flow if SendGrid isn't set up during early dev,
-    // it will just log to console. In production, you'd want this to be a hard failure.
-    return;
+    // Log OTP to console as a fallback
+    console.log(`--- OTP FOR ${to} (Email Service Not Fully Configured) ---`);
+    console.log(`--- OTP: ${otp}`);
+    console.log(`-------------------------------------------------------`);
+    return; // Exit if essential configs are missing
   }
 
   const msg = {
     to: to,
-    from: process.env.FROM_EMAIL, // Use the email address or domain you verified with SendGrid
+    from: fromEmail, // Use the email address or domain you verified with SendGrid
     subject: 'Your OTP Code for Audio Emporium',
     text: `Your One-Time Password (OTP) for Audio Emporium is: ${otp}. This code will expire in 10 minutes.`,
     html: `
@@ -44,19 +44,25 @@ export async function sendOtpEmail(to: string, otp: string): Promise<void> {
     `,
   };
 
+  console.log(`Attempting to send OTP email to ${to} from ${fromEmail} using SendGrid...`);
+
   try {
     await sgMail.send(msg);
-    console.log(`OTP email successfully sent to ${to}`);
-  } catch (error) {
-    console.error('Error sending OTP email via SendGrid:', error);
-    if ((error as any).response) {
-      console.error('SendGrid Error Body:', (error as any).response.body);
+    console.log(`OTP email successfully sent to ${to} via SendGrid.`);
+  } catch (error: any) {
+    console.error('Error sending OTP email via SendGrid:');
+    if (error.response) {
+      console.error('SendGrid Error Response Status:', error.response.statusCode);
+      console.error('SendGrid Error Response Headers:', JSON.stringify(error.response.headers, null, 2));
+      console.error('SendGrid Error Response Body:', JSON.stringify(error.response.body, null, 2));
+    } else {
+      console.error('SendGrid Error (no response object):', error.message, error);
     }
     // Fallback: Log OTP to console if email sending fails
-    console.log(`--- OTP FOR ${to} (SendGrid send failed) ---`);
-    console.log(`OTP: ${otp}`);
-    console.log(`---------------------------------------------`);
-    // Depending on your error handling strategy, you might want to re-throw the error
-    // or handle it in a way that informs the user the email might not have been sent.
-    // For this example, we'll let the flow continue, relying on the console log.
-    //
+    console.log(`--- OTP FOR ${to} (SendGrid send FAILED - see error above) ---`);
+    console.log(`--- OTP: ${otp}`);
+    console.log(`-----------------------------------------------------------`);
+    // Depending on your strategy, you might want to re-throw or handle differently.
+    // For now, we log and let the OTP be available in console for development.
+  }
+}

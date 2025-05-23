@@ -1,3 +1,4 @@
+
 // src/app/api/auth/otp/request/route.ts
 import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
@@ -42,12 +43,12 @@ export async function POST(req: NextRequest) {
     const expiresAt = addMinutes(new Date(), 10); // OTP expires in 10 minutes
 
     // Send OTP email
-     try {
-      await sendOtpEmail(email, otpCode);
-      console.log(`Resend OTP for ${email} sent via email. Fallback OTP logged: ${otpCode}`);
+    console.log(`Generated OTP for ${email} via resend request: ${otpCode}. Attempting to send email...`);
+    try {
+      await sendOtpEmail(email, otpCode); // Await the email sending
+      console.log(`Resend OTP email process initiated for ${email}. Check console for SendGrid logs or fallback OTP.`);
     } catch (emailError) {
-      console.error(`Failed to resend OTP email to ${email}, but OTP is generated: ${otpCode}`, emailError);
-      // Continue the process even if email fails, user can check console log.
+      console.error(`Failed to resend OTP email to ${email}. OTP is still generated and logged: ${otpCode}. Error:`, emailError);
     }
 
     await prisma.otp.deleteMany({ where: { email }});
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ message: 'New OTP generated and sent to your email (Check server console for OTP if email is not received).' }, { status: 200 });
+    return NextResponse.json({ message: 'New OTP generated. An email should be sent. (Check server console for OTP if email is not received).' }, { status: 200 });
 
   } catch (error) {
     console.error('OTP Request Error:', error);
