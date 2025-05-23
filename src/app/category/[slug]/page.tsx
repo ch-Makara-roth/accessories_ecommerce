@@ -1,47 +1,99 @@
+
+'use client';
+
 import ProductGrid from '@/components/products/ProductGrid';
 import FilterBar from '@/components/products/FilterBar';
-import { getProductsByCategory, products as allProducts } from '@/data/products';
-import { popularCategories } from '@/data/categories';
-import type { Product } from '@/types';
+import type { Product, Category } from '@/types';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
-interface CategoryPageProps {
-  params: { slug: string };
-}
+export default function CategoryPage() {
+  const params = useParams();
+  const slug = params.slug as string;
+  const { toast } = useToast();
 
-export async function generateStaticParams() {
-  const categorySlugs = popularCategories.map(cat => ({ slug: cat.slug }));
-  // Add an "all" category if desired
-  // categorySlugs.push({ slug: 'all' }); 
-  return categorySlugs;
-}
+  const [category, setCategory] = useState<Category | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  const fetchCategoryData = useCallback(async () => {
+    if (!slug) return;
+    setIsLoading(true);
+    setError(null);
 
-export default function CategoryPage({ params }: CategoryPageProps) {
-  const { slug } = params;
-  const category = popularCategories.find(cat => cat.slug === slug);
-  const categoryProducts: Product[] = category ? getProductsByCategory(slug) : allProducts; // Show all if slug not found or is 'all'
+    try {
+      // Fetch category details
+      const categoryRes = await fetch(`/api/categories/slug/${slug}`);
+      if (!categoryRes.ok) {
+        if (categoryRes.status === 404) {
+          throw new Error(`Category "${slug}" not found.`);
+        }
+        const errorData = await categoryRes.json().catch(() => ({ error: `Failed to fetch category details. Status: ${categoryRes.status}` }));
+        throw new Error(errorData.error);
+      }
+      const categoryData: Category = await categoryRes.json();
+      setCategory(categoryData);
 
-  if (!category && slug !== 'all') { // If slug is not 'all' and category not found
+      // Fetch products for this category
+      const productsRes = await fetch(`/api/products?categorySlug=${slug}`);
+      if (!productsRes.ok) {
+        const errorData = await productsRes.json().catch(() => ({ error: `Failed to fetch products for category. Status: ${productsRes.status}` }));
+        throw new Error(errorData.error);
+      }
+      const productsData = await productsRes.json();
+      setProducts(productsData.products || []);
+
+    } catch (err) {
+      console.error("Error fetching category page data:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      // Do not toast here, let the UI render the error state
+    } finally {
+      setIsLoading(false);
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    fetchCategoryData();
+  }, [fetchCategoryData]);
+
+  if (isLoading) {
     return (
-        <div className="text-center py-10">
-            <h1 className="text-3xl font-bold mb-4 text-destructive">Category Not Found</h1>
-            <p className="text-muted-foreground mb-6">The category "{slug}" does not exist.</p>
-            <Button asChild>
-                <Link href="/">Go to Homepage</Link>
-            </Button>
-        </div>
+      <div className="text-center py-20">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+        <p className="text-muted-foreground">Loading category...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-10">
+        <h1 className="text-3xl font-bold mb-4 text-destructive">Error</h1>
+        <p className="text-muted-foreground mb-6">{error}</p>
+        <Button asChild>
+          <Link href="/">Go to Homepage</Link>
+        </Button>
+      </div>
     );
   }
   
-  const pageTitle = category ? category.name : "All Products";
+  const pageTitle = category ? category.name : "Products";
 
   return (
     <div>
       <h1 className="text-3xl md:text-4xl font-bold text-center my-8 text-primary">{pageTitle}</h1>
       <FilterBar />
-      <ProductGrid products={categoryProducts} />
+      {products.length > 0 ? (
+        <ProductGrid products={products} />
+      ) : (
+        <p className="text-center text-muted-foreground py-8">No products found in this category.</p>
+      )}
     </div>
   );
 }

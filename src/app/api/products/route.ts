@@ -7,12 +7,6 @@ import type { Prisma } from '@prisma/client';
 import fs from 'fs/promises';
 import path from 'path';
 
-// Ensure Prisma client is available
-if (!prisma) {
-  console.error('API /api/products: CRITICAL - Prisma client is not initialized.');
-  // This block ideally shouldn't be reached if prisma client setup is correct in lib/prisma.ts
-}
-
 // GET handler
 export async function GET(request: NextRequest) {
   console.log('API GET /api/products: Received request.');
@@ -25,18 +19,43 @@ export async function GET(request: NextRequest) {
   console.log('API GET /api/products: Prisma client and prisma.product.findMany seem available.');
   
   const { searchParams } = new URL(request.url);
-  const categoryIdsParam = searchParams.get('categoryId');
+  const categoryIdParam = searchParams.get('categoryId');
+  const categorySlugParam = searchParams.get('categorySlug');
   const statusesParam = searchParams.get('status');
+  const searchQueryParam = searchParams.get('searchQuery');
+  const isOnOfferParam = searchParams.get('isOnOffer');
+  const sortByParam = searchParams.get('sortBy');
+  const sortOrderParam = searchParams.get('sortOrder') as Prisma.SortOrder | undefined || 'asc';
+  const limitParam = searchParams.get('limit');
+  const excludeProductIdParam = searchParams.get('excludeProductId');
 
   try {
     const whereClause: Prisma.ProductWhereInput = {};
+    const orderByClause: Prisma.ProductOrderByWithRelationInput = {};
+
+    if (excludeProductIdParam) {
+      whereClause.id = { not: excludeProductIdParam };
+    }
     
-    if (categoryIdsParam && categoryIdsParam !== 'all-categories') {
-      const categoryIds = categoryIdsParam.split(',');
-      if (categoryIds.length > 0) {
-        whereClause.categoryId = { in: categoryIds };
+    let resolvedCategoryId: string | undefined = categoryIdParam || undefined;
+
+    if (categorySlugParam && categorySlugParam !== 'all-categories') {
+      const category = await prisma.category.findUnique({
+        where: { slug: categorySlugParam },
+        select: { id: true }
+      });
+      if (category) {
+        resolvedCategoryId = category.id;
+      } else {
+        // If slug doesn't match, return no products for this slug
+        return NextResponse.json({ products: [] }, { status: 200 });
       }
     }
+    
+    if (resolvedCategoryId && resolvedCategoryId !== 'all-categories') {
+        whereClause.categoryId = resolvedCategoryId;
+    }
+
 
     if (statusesParam && statusesParam !== 'all-statuses') {
       const statuses = statusesParam.split(',');
@@ -45,11 +64,53 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    if (searchQueryParam) {
+      whereClause.OR = [
+        { name: { contains: searchQueryParam, mode: 'insensitive' } },
+        { description: { contains: searchQueryParam, mode: 'insensitive' } },
+        { tags: { has: searchQueryParam.toLowerCase() } }, // Assumes tags are stored as an array of lowercase strings
+      ];
+    }
+
+    if (isOnOfferParam === 'true') {
+      whereClause.OR = [
+        ...(whereClause.OR || []), // Keep existing OR conditions if any (e.g., from search)
+        { offer: { not: null, not: '' } },
+        { 
+          AND: [
+            { originalPrice: { not: null } },
+            { originalPrice: { gt: 0 } }, // Ensure originalPrice is positive
+            { price: { lt: prisma.product.fields.originalPrice } } // Using Prisma.ProductScalarFieldEnum for type safety if needed, or direct field access
+          ]
+        }
+      ];
+      // If OR was just for offer, and it was empty before, make sure it's not just an empty OR
+      if (whereClause.OR.length === 2 && JSON.stringify(whereClause.OR[0]) === "{}") {
+         whereClause.OR.shift();
+      } else if (whereClause.OR.length > 2 && JSON.stringify(whereClause.OR[0]) === "{}") {
+         // This case should not happen with current logic but defensive
+      }
+
+    }
+    
+    if (sortByParam) {
+        if (sortByParam === 'createdAt' || sortByParam === 'price' || sortByParam === 'name' || sortByParam === 'rating' || sortByParam === 'stock' ) {
+             orderByClause[sortByParam] = sortOrderParam;
+        } else {
+            orderByClause['createdAt'] = 'desc'; // Default sort
+        }
+    } else {
+        orderByClause['createdAt'] = 'desc'; // Default sort
+    }
+
+
     console.log('API GET /api/products: Using whereClause:', JSON.stringify(whereClause));
+    console.log('API GET /api/products: Using orderByClause:', JSON.stringify(orderByClause));
 
     const productsFromDB = await prisma.product.findMany({
       where: whereClause,
-      orderBy: { name: 'asc' },
+      orderBy: orderByClause,
+      take: limitParam ? parseInt(limitParam, 10) : undefined,
       include: { category: true },
     });
 
@@ -62,7 +123,7 @@ export async function GET(request: NextRequest) {
       rating: typeof productDoc.rating === 'number' ? productDoc.rating : 0,
       reviewCount: typeof productDoc.reviewCount === 'number' ? productDoc.reviewCount : 0,
       description: productDoc.description || '',
-      image: productDoc.image || '/placehold.co/600x400.png', // Default if no image
+      image: productDoc.image || '/placehold.co/600x400.png', 
       category: productDoc.category ? {
         id: productDoc.category.id,
         _id: productDoc.category.id,
@@ -80,6 +141,8 @@ export async function GET(request: NextRequest) {
       dataAiHint: productDoc.dataAiHint || `${productDoc.category?.name || 'product'} ${productDoc.name || 'item'}`.substring(0,50).toLowerCase(),
       stock: typeof productDoc.stock === 'number' ? productDoc.stock : 0,
       status: productDoc.status || 'Draft',
+      createdAt: productDoc.createdAt, // Ensure createdAt is passed
+      updatedAt: productDoc.updatedAt, // Ensure updatedAt is passed
     }));
     console.log(`API GET /api/products: Successfully fetched ${sanitizedProducts.length} products with filters.`);
     return NextResponse.json({ products: sanitizedProducts }, { status: 200 });
@@ -89,7 +152,6 @@ export async function GET(request: NextRequest) {
     let errorDetails = e.message;
     console.error('API GET /api/products Error (Prisma):', e);
 
-    // ... (existing error handling for GET)
      if (e.name === 'MongoServerSelectionError' || e.name === 'MongoNetworkError' || e.message?.includes('ECONNREFUSED') || e.message?.includes('tlsv1 alert internal error')) {
         errorMessage = `MongoDB Connection Error: ${e.message}. Please verify MONGODB_URI and DATABASE_URL in .env.local. Ensure MongoDB Atlas IP Access List includes your current IP and the server is restarted. Also, check server console logs.`;
     } else if (e.message?.includes("Environment variable not found: DATABASE_URL")) {
@@ -97,7 +159,7 @@ export async function GET(request: NextRequest) {
     }  else if (e.code === 'P2021' || e.message?.includes("The table `accessorice-app.Product` does not exist in the current database")) {
         errorMessage = `Prisma Error: The collection 'Product' (mapped to 'accessorice-app') was not found in the database 'accessorice-app'. Ensure 'npx prisma db push' has been run successfully after defining models.`;
         errorDetails = e.message;
-    }  else if (e.code === 'P2002' && e.meta?.target) { // Unique constraint failed
+    }  else if (e.code === 'P2002' && e.meta?.target) { 
         errorMessage = `Database Error: A unique constraint failed on ${Array.isArray(e.meta.target) ? e.meta.target.join(', ') : e.meta.target}.`;
     } else if (e.message?.includes("Cannot read properties of undefined (reading 'findMany')") || (e.message?.includes("TypeError") && e.message?.includes(".findMany is not a function"))) {
       errorMessage = 'Internal Server Error: Prisma product model is not accessible (cannot call .findMany). Ensure `npx prisma generate` has been run and server restarted.';
@@ -135,30 +197,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required product fields (name, price, description)' }, { status: 400 });
     }
 
-    let imageUrl = `/placehold.co/600x400.png?text=${encodeURIComponent(String(productFields.name).substring(0,20)) || 'No+Image'}`; // Default
+    let imageUrl = `/placehold.co/600x400.png?text=${encodeURIComponent(String(productFields.name).substring(0,20)) || 'No+Image'}`; 
     const imageFile = formData.get('imageFile') as File | null;
 
-    if (imageFile) {
-      // --- DEVELOPMENT ONLY: Local File Storage ---
-      // NOT SUITABLE FOR PRODUCTION ON SERVERLESS PLATFORMS (e.g., Vercel)
-      console.warn("API POST /api/products: USING LOCAL FILE STORAGE FOR IMAGE. THIS IS FOR DEVELOPMENT ONLY AND NOT PRODUCTION-READY.");
-      
+    if (imageFile && imageFile.size > 0) {
+      console.log("API POST /api/products: Image file provided:", imageFile.name, imageFile.type, imageFile.size);
       const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'products');
-      await fs.mkdir(uploadsDir, { recursive: true }); // Ensure directory exists
+      await fs.mkdir(uploadsDir, { recursive: true }); 
 
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      const fileExtension = path.extname(imageFile.name) || '.jpg'; // Default extension
-      const uniqueFilename = `${path.basename(imageFile.name, fileExtension)}-${uniqueSuffix}${fileExtension}`;
+      const fileExtension = path.extname(imageFile.name) || '.jpg'; 
+      const uniqueFilename = `${path.basename(imageFile.name, fileExtension).replace(/[^a-zA-Z0-9-_]/g, '')}-${uniqueSuffix}${fileExtension}`;
       const filePath = path.join(uploadsDir, uniqueFilename);
 
       const fileBuffer = Buffer.from(await imageFile.arrayBuffer());
       await fs.writeFile(filePath, fileBuffer);
 
-      imageUrl = `/uploads/products/${uniqueFilename}`; // Relative path for serving from public
+      imageUrl = `/uploads/products/${uniqueFilename}`; 
       console.log(`API POST /api/products: Image saved locally to ${filePath}. Public URL: ${imageUrl}`);
-      // --- END DEVELOPMENT ONLY ---
     } else {
-        console.log("API POST /api/products: No image file provided for product:", productFields.name);
+        console.log("API POST /api/products: No image file provided or file is empty for product:", productFields.name);
     }
 
     const parsedPrice = parseFloat(String(productFields.price));
@@ -196,11 +254,11 @@ export async function POST(request: NextRequest) {
     let categoryNameForHint = 'product'; 
     const categoryId = productFields.category ? String(productFields.category) : null;
 
-    if (categoryId && categoryId.trim() !== '' && /^[0-9a-fA-F]{24}$/.test(categoryId)) {
+    if (categoryId && categoryId.trim() !== '' && /^[0-9a-fA-F]{24}$/.test(categoryId)) { // Check if it's a valid ObjectId format
         try {
           const categoryExists = await prisma.category.findUnique({ where: { id: categoryId } });
           if (categoryExists) {
-            dataToCreate.category = { connect: { id: categoryId } };
+            dataToCreate.category = { connect: { id: categoryId } }; // Correct way to link relation
             categoryNameForHint = categoryExists.name;
           } else {
             console.warn(`API POST /api/products: Category with ID "${categoryId}" not found for product "${dataToCreate.name}". Product will be created without category linkage.`);
@@ -216,6 +274,7 @@ export async function POST(request: NextRequest) {
         console.warn(`API POST /api/products: Provided category ID "${categoryId}" for product "${dataToCreate.name}" is not a valid ObjectId format. Product will be created without category linkage.`);
     }
 
+
     dataToCreate.dataAiHint = `${categoryNameForHint} ${dataToCreate.name || 'item'}`.substring(0, 50).toLowerCase();
 
     console.log('API POST /api/products: Attempting to create product with data:', JSON.stringify(dataToCreate, null, 2));
@@ -230,23 +289,24 @@ export async function POST(request: NextRequest) {
     let errorMessage = 'An unexpected error occurred while adding the product.';
     let errorDetails = e.message || String(e);
 
-    if (e.code === 'P2002' && e.meta?.target) { 
-        errorMessage = `A product with this ${Array.isArray(e.meta.target) ? e.meta.target.join(', ') : e.meta.target} already exists.`;
-        errorDetails = `The field(s) '${Array.isArray(e.meta.target) ? e.meta.target.join(', ') : e.meta.target}' must be unique.`;
-    } else if (e.code === 'P2023' && e.message?.includes('Malformed ObjectID')) {
-        errorMessage = `Invalid Category ID format. Please ensure a valid category is selected. Details: ${e.message}`;
-        errorDetails = e.message;
-    } else if (e.code === 'P2025' ) {
-        errorMessage = "Record not found. The category ID you tried to connect might not exist."
+    if (e instanceof Prisma.PrismaClientKnownRequestError) {
+        if (e.code === 'P2002' && e.meta?.target) { 
+            errorMessage = `A product with this ${Array.isArray(e.meta.target) ? e.meta.target.join(', ') : e.meta.target} already exists.`;
+            errorDetails = `The field(s) '${Array.isArray(e.meta.target) ? e.meta.target.join(', ') : e.meta.target}' must be unique.`;
+        } else if (e.code === 'P2023' && e.message?.includes('Malformed ObjectID')) {
+            errorMessage = `Invalid Category ID format. Please ensure a valid category is selected. Details: ${e.message}`;
+        } else if (e.code === 'P2025' ) { // Relation constraint failed
+            errorMessage = "Record not found. The category ID you tried to connect might not exist.";
+        } else {
+            errorMessage = `Prisma Error: ${e.message}`;
+        }
     } else if (e.message && (e.message.includes("Argument `category`: Invalid value provided. Expected String or Null, provided Object.") || e.message.includes("Expected `ProductCreateInput` or `ProductUncheckedCreateInput`"))) {
       errorMessage = "Prisma schema mismatch or outdated client. Ensure `npx prisma generate` has been run successfully after defining the Product-Category relation in your `schema.prisma` and that your server has been restarted. This is a critical step for Prisma to understand your data model correctly."
-      errorDetails = e.message;
     } else if (e.message?.includes("Cannot read properties of undefined (reading 'create')") || (e.message?.includes("TypeError") && e.message?.includes(".create is not a function"))) {
       errorMessage = 'Internal Server Error: Prisma product model is not accessible (cannot call .create). Ensure `npx prisma generate` has been run and server restarted.';
       errorDetails = e.stack || e.message;
     } else if (e.message?.includes('ECONNREFUSED') || e.message?.includes('MongoServerSelectionError')) {
         errorMessage = "MongoDB Connection Error during product creation. Please verify MONGODB_URI / DATABASE_URL in .env.local and ensure MongoDB Atlas IP Access List includes your current IP. Also, check server console logs.";
-        errorDetails = e.message;
     }
 
     return NextResponse.json({ error: 'Failed to add product', details: errorDetails, message: errorMessage }, { status: 500 });

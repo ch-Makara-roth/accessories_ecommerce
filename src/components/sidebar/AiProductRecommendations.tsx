@@ -1,14 +1,15 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import type { Product } from '@/types';
 import { getPersonalizedProductRecommendations, type PersonalizedProductRecommendationsOutput } from '@/ai/flows/personalized-product-recommendations';
-import { products as allProducts, getProductById } from '@/data/products'; 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Image from 'next/image';
 import Link from 'next/link';
-import AddToCartButton from '../products/AddToCartButton'; // Updated import
+import AddToCartButton from '../products/AddToCartButton';
+import { Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface RecommendedProductItemProps {
   product: Product;
@@ -29,7 +30,7 @@ const RecommendedProductItem: React.FC<RecommendedProductItemProps> = React.memo
       </Link>
       <div className="flex-1">
         <Link href={`/product/${product.id}`}>
-          <h4 className="text-sm font-semibold text-foreground hover:text-primary transition-colors">{product.name}</h4>
+          <h4 className="text-sm font-semibold text-foreground hover:text-primary transition-colors line-clamp-2">{product.name}</h4>
         </Link>
         <p className="text-sm text-primary font-bold">${product.price.toFixed(2)}</p>
           <AddToCartButton product={product} size="sm" variant="outline" className="mt-2 text-xs">
@@ -45,37 +46,57 @@ const AiProductRecommendations = () => {
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const fetchProductDetails = useCallback(async (productId: string): Promise<Product | null> => {
+    try {
+      const res = await fetch(`/api/products/${productId}`);
+      if (!res.ok) {
+        console.warn(`Failed to fetch details for product ID ${productId}. Status: ${res.status}`);
+        return null;
+      }
+      return await res.json();
+    } catch (err) {
+      console.error(`Error fetching details for product ID ${productId}:`, err);
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
     const fetchRecommendations = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
-        // Mock browsing history
-        const browsingHistory = ['p1', 'p4']; // Example product IDs
+        const browsingHistory = ['p1', 'p4']; // Example: Replace with actual user browsing history
         
-        const result: PersonalizedProductRecommendationsOutput = await getPersonalizedProductRecommendations({ browsingHistory });
+        const aiResult: PersonalizedProductRecommendationsOutput = await getPersonalizedProductRecommendations({ browsingHistory });
         
-        if (result && result.productRecommendations) {
-          const recommendedProducts = result.productRecommendations
-            .map(id => getProductById(id))
-            .filter((p): p is Product => p !== undefined) // Type guard to filter out undefined
-            .slice(0, 3); // Limit to 3 recommendations for display
-          setRecommendations(recommendedProducts);
+        if (aiResult && aiResult.productRecommendations && aiResult.productRecommendations.length > 0) {
+          const productPromises = aiResult.productRecommendations
+            .slice(0, 3) // Take top 3 IDs
+            .map(id => fetchProductDetails(id));
+          
+          const fetchedProducts = (await Promise.all(productPromises)).filter((p): p is Product => p !== null);
+          setRecommendations(fetchedProducts);
+
+          if (fetchedProducts.length === 0 && aiResult.productRecommendations.length > 0) {
+            console.warn("AI recommended product IDs, but failed to fetch details for them.");
+            // setError("Could not load recommendation details."); // Optionally set error
+          }
         } else {
-          setRecommendations([]);
+          setRecommendations([]); // No recommendations from AI
         }
       } catch (err) {
-        console.error("Error fetching AI recommendations:", err);
-        setError("Failed to load recommendations.");
-        // Fallback to generic popular items if AI fails
-        setRecommendations(allProducts.slice(0,3).sort(() => 0.5 - Math.random()));
+        console.error("Error fetching AI recommendations flow:", err);
+        setError("Failed to load recommendations at this time.");
+        toast({ variant: 'destructive', title: 'Recommendation Error', description: 'Could not load personalized recommendations.' });
       } finally {
         setLoading(false);
       }
     };
 
     fetchRecommendations();
-  }, []);
+  }, [fetchProductDetails, toast]);
 
   if (loading) {
     return (
@@ -107,7 +128,7 @@ const AiProductRecommendations = () => {
           <CardTitle className="text-xl text-primary">Recommended For You</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">{error}</p>
+          <p className="text-muted-foreground text-sm">{error}</p>
         </CardContent>
       </Card>
     );
@@ -120,12 +141,11 @@ const AiProductRecommendations = () => {
           <CardTitle className="text-xl text-primary">Recommended For You</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">No specific recommendations for you at the moment. Check out our popular items!</p>
+          <p className="text-muted-foreground text-sm">No specific recommendations for you at the moment. Explore our popular items!</p>
         </CardContent>
       </Card>
     );
   }
-
 
   return (
     <Card className="mb-6 shadow-lg">
