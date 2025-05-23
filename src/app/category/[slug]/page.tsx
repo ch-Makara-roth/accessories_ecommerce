@@ -27,26 +27,42 @@ export default function CategoryPage() {
     setError(null);
 
     try {
-      // Fetch category details
-      const categoryRes = await fetch(`/api/categories/slug/${slug}`);
-      if (!categoryRes.ok) {
-        if (categoryRes.status === 404) {
-          throw new Error(`Category "${slug}" not found.`);
+      let categoryData: Category | null = null;
+      let productsApiUrl = '';
+
+      if (slug === 'all') {
+        categoryData = { id: 'all', name: 'All Products', slug: 'all', createdAt: new Date(), updatedAt: new Date() }; // Mock category for "All Products"
+        productsApiUrl = `/api/products?categorySlug=all-categories`; // Use the special slug for API
+      } else {
+        // Fetch specific category details
+        const categoryRes = await fetch(`/api/categories/slug/${slug}`);
+        if (!categoryRes.ok) {
+          if (categoryRes.status === 404) {
+            throw new Error(`Category "${slug}" not found.`);
+          }
+          const errorData = await categoryRes.json().catch(() => ({ error: `Failed to fetch category details. Status: ${categoryRes.status}` }));
+          throw new Error(errorData.error);
         }
-        const errorData = await categoryRes.json().catch(() => ({ error: `Failed to fetch category details. Status: ${categoryRes.status}` }));
-        throw new Error(errorData.error);
+        categoryData = await categoryRes.json();
+        productsApiUrl = `/api/products?categorySlug=${slug}`;
       }
-      const categoryData: Category = await categoryRes.json();
+      
       setCategory(categoryData);
 
-      // Fetch products for this category
-      const productsRes = await fetch(`/api/products?categorySlug=${slug}`);
-      if (!productsRes.ok) {
-        const errorData = await productsRes.json().catch(() => ({ error: `Failed to fetch products for category. Status: ${productsRes.status}` }));
-        throw new Error(errorData.error);
+      // Fetch products
+      if (productsApiUrl) {
+        const productsRes = await fetch(productsApiUrl);
+        if (!productsRes.ok) {
+          const errorData = await productsRes.json().catch(() => ({ error: `Failed to fetch products. Status: ${productsRes.status}` }));
+          throw new Error(errorData.error);
+        }
+        const productsData = await productsRes.json();
+        setProducts(productsData.products || []);
+      } else if (slug !== 'all' && !categoryData) {
+        // This case might occur if category fetch succeeded but somehow categoryData is null (should not happen with current logic)
+         throw new Error(`Category "${slug}" data could not be processed correctly.`);
       }
-      const productsData = await productsRes.json();
-      setProducts(productsData.products || []);
+
 
     } catch (err) {
       console.error("Error fetching category page data:", err);
@@ -66,7 +82,7 @@ export default function CategoryPage() {
     return (
       <div className="text-center py-20">
         <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-        <p className="text-muted-foreground">Loading category...</p>
+        <p className="text-muted-foreground">Loading {slug === 'all' ? 'products' : `category: ${slug}`}...</p>
       </div>
     );
   }
@@ -92,7 +108,7 @@ export default function CategoryPage() {
       {products.length > 0 ? (
         <ProductGrid products={products} />
       ) : (
-        <p className="text-center text-muted-foreground py-8">No products found in this category.</p>
+        <p className="text-center text-muted-foreground py-8">No products found {slug === 'all' ? '' : `in the "${pageTitle}" category`}.</p>
       )}
     </div>
   );
