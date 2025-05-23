@@ -5,6 +5,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import type { Role } from '@prisma/client'; // Import Role enum from Prisma
 
 if (!process.env.GOOGLE_CLIENT_ID) {
   throw new Error('Missing GOOGLE_CLIENT_ID environment variable');
@@ -15,7 +16,7 @@ if (!process.env.GOOGLE_CLIENT_SECRET) {
 if (!process.env.NEXTAUTH_SECRET) {
   throw new Error('Missing NEXTAUTH_SECRET environment variable');
 }
-if (!process.env.DATABASE_URL) { 
+if (!process.env.DATABASE_URL) {
   throw new Error('Missing DATABASE_URL environment variable for Prisma');
 }
 
@@ -25,8 +26,6 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      // Prisma adapter automatically handles account linking for OAuth providers.
-      // It also sets emailVerified if the provider confirms it.
     }),
     CredentialsProvider({
       name: 'Credentials',
@@ -54,7 +53,6 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (!user.emailVerified) {
-          // Custom error code or message that the client can specifically check for
           throw new Error('Email not verified. Please check your inbox for a verification code or request a new one.');
         }
         
@@ -63,39 +61,35 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           email: user.email,
           image: user.image,
-          // emailVerified: user.emailVerified // Can be passed if needed by client session
-        } as NextAuthUser; 
+          role: user.role, // Include role
+        } as NextAuthUser & { role: Role }; // Type assertion to include role
       }
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
-    signIn: '/auth', 
-    error: '/auth', // Redirect to /auth on error, error type will be in query params
+    signIn: '/auth',
+    error: '/auth',
   },
   session: {
-    strategy: 'jwt', 
+    strategy: 'jwt',
   },
   callbacks: {
     async session({ session, token }) {
       if (token.sub && session.user) {
         session.user.id = token.sub;
-        // Add emailVerified to session if needed by client
-        // if (token.emailVerified) {
-        //   (session.user as any).emailVerified = token.emailVerified;
-        // }
+        if (token.role) {
+          session.user.role = token.role as Role; // Add role to session
+        }
       }
       return session;
     },
-    async jwt({ token, user, account }) {
-      if (user) { 
+    async jwt({ token, user }) {
+      if (user) {
         token.sub = user.id;
-        // if (user.emailVerified) { // user object from authorize or OAuth
-        //   token.emailVerified = user.emailVerified;
-        // }
-      }
-      if (account) {
-        token.accessToken = account.access_token;
+        if (user.role) {
+          token.role = user.role as Role; // Add role to JWT from User object
+        }
       }
       return token;
     },

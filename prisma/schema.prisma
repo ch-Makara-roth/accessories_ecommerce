@@ -1,3 +1,4 @@
+
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
@@ -17,10 +18,11 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String? // Added for email/password auth
+  role          Role      @default(CUSTOMER) // Added for role management
   accounts      Account[]
   sessions      Session[]
   orders        Order[] // Relation to Order model
-  Otps          Otp[] // Relation to Otp model
+  otps          Otp[] // Relation to Otp model
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -79,38 +81,38 @@ model Otp {
   email     String
   otp       String
   expiresAt DateTime
-  userId    String?  @db.ObjectId // Optional: Link OTP to a user if they exist
+  userId    String?  @db.ObjectId // Optional: Link OTP to user if they exist
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@map("Otps")
+  @@unique([email, otp]) // Or just email if only one OTP active per email
+  @@map("Otp")
 }
 
 model Product {
-  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  id              String       @id @default(auto()) @map("_id") @db.ObjectId
   name            String
-  description     String
   price           Float
   originalPrice   Float?
+  rating          Float?       @default(0)
+  reviewCount     Int?         @default(0)
+  description     String
   image           String?
-  stock           Int?
-  status          String?   @default("Draft") // e.g., Active, Draft, Archived
-  rating          Float?    @default(0)
-  reviewCount     Int?      @default(0)
-  type            String? // e.g., "Wireless", "Wired"
+  type            String?
   color           String?
   material        String?
-  offer           String? // e.g., "50% Off"
-  tags            String[]  @default([])
-  dataAiHint      String?   @default("product item")
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  categoryId      String?   @db.ObjectId
-  category        Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  orderItems      OrderItem[] // Relation to OrderItem model
-
+  offer           String?
+  tags            String[]
+  dataAiHint      String?
+  stock           Int?
+  status          String?      @default("Draft") // e.g., Active, Draft, Archived
+  categoryId      String?      @db.ObjectId
+  category        Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  orderItems      OrderItem[]  // Relation to OrderItem model
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
   @@map("accessorice-app")
 }
 
@@ -121,7 +123,6 @@ model Category {
   products  Product[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-
   @@map("categories")
 }
 
@@ -131,11 +132,10 @@ model Order {
   user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   totalAmount     Float
   status          String // e.g., Pending, Processing, Shipped, Delivered, Cancelled
-  shippingAddress Json? // Store as JSON or create separate address fields/model
+  shippingAddress Json? // Store as JSON or create a separate Address model
+  orderItems      OrderItem[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
-  orderItems      OrderItem[]
-
   @@map("Orders")
 }
 
@@ -144,10 +144,11 @@ model OrderItem {
   orderId   String  @db.ObjectId
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String  @db.ObjectId
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade) // Consider onDelete: Restrict or SetNull based on requirements
+  product   Product @relation(fields: [productId], references: [id], onDelete:Restrict) // Restrict deletion of product if it's in an order
   quantity  Int
   price     Float // Price of the product at the time of order
-
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   @@map("OrderItems")
 }
 
@@ -155,10 +156,16 @@ model AdminNotification {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   title       String
   description String
-  category    String   // e.g., "New Order", "Low Stock", "User Signup"
+  category    String // e.g., "New Order", "Low Stock", "User Signup"
   isRead      Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   @@map("AdminNotifications")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  SELLER // For sellers who manage products and sales
+  STOCK  // For stock managers
 }

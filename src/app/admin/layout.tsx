@@ -13,8 +13,8 @@ import {
   UserCircle,
   List,
   Shapes,
-  Search, 
-  Menu, 
+  Search,
+  Menu,
   X,
   LogOut,
   ChevronDown
@@ -35,12 +35,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"; 
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
 import { useState, useEffect, type KeyboardEvent } from 'react';
-import type { AdminNotification } from '@/types'; // Assuming AdminNotification type
+import type { AdminNotification } from '@/types';
+import { useSession, signOut } from 'next-auth/react'; // Import useSession and signOut
+import { Loader2 } from 'lucide-react'; // For loading state
+import type { Role } from '@prisma/client'; // Import Role enum from Prisma
 
 interface AdminNavItem {
   href: string;
@@ -48,7 +51,8 @@ interface AdminNavItem {
   icon: React.ElementType;
   subItems?: AdminNavItem[];
   isAccordion?: boolean;
-  badgeCount?: number; 
+  badgeCount?: number;
+  allowedRoles: Role[]; // Define which roles can see this item
 }
 
 export default function AdminLayout({
@@ -57,13 +61,28 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter(); // For redirecting
+  const { data: session, status } = useSession(); // Get session data and status
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [adminSearchTerm, setAdminSearchTerm] = useState('');
   const { toast } = useToast();
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
+  const userRole = session?.user?.role;
+  const allowedAdminRoles: Role[] = [Role.ADMIN, Role.SELLER, Role.STOCK];
+
   useEffect(() => {
+    if (status === 'loading') return; // Do nothing while loading
+    if (status === 'unauthenticated' || !session || !userRole || !allowedAdminRoles.includes(userRole)) {
+      router.push('/auth?error=AccessDeniedAdmin'); // Redirect to auth page or an unauthorized page
+    }
+  }, [session, status, userRole, router]);
+
+
+  useEffect(() => {
+    if (!session || !userRole || !allowedAdminRoles.includes(userRole)) return; // Don't fetch if user not authorized
+
     const fetchUnreadCount = async () => {
       try {
         const response = await fetch('/api/admin/notifications?unread=true');
@@ -78,33 +97,32 @@ export default function AdminLayout({
       }
     };
     fetchUnreadCount();
-    // Optionally, set up an interval to poll for new notifications
-    // const intervalId = setInterval(fetchUnreadCount, 30000); // every 30 seconds
-    // return () => clearInterval(intervalId);
-  }, []);
+  }, [session, userRole]);
 
   const navItems: AdminNavItem[] = [
-    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK] },
     {
       href: '/admin/products',
       label: 'Products',
       icon: ShoppingBag,
       isAccordion: true,
       subItems: [
-        { href: '/admin/products', label: 'Product List', icon: List },
-        { href: '/admin/products/categories', label: 'Categories', icon: Shapes },
+        { href: '/admin/products', label: 'Product List', icon: List, allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK] },
+        { href: '/admin/products/categories', label: 'Categories', icon: Shapes, allowedRoles: [Role.ADMIN, Role.SELLER] },
       ],
+      allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK], // Parent item role
     },
-    { href: '/admin/sales', label: 'Sales', icon: DollarSign },
-    { href: '/admin/users', label: 'Customers', icon: Users },
-    { href: '/admin/analytics', label: 'Analytics', icon: LineChart },
+    { href: '/admin/sales', label: 'Sales', icon: DollarSign, allowedRoles: [Role.ADMIN, Role.SELLER] },
+    { href: '/admin/users', label: 'Customers', icon: Users, allowedRoles: [Role.ADMIN] },
+    { href: '/admin/analytics', label: 'Analytics', icon: LineChart, allowedRoles: [Role.ADMIN] },
     {
       href: '/admin/notifications',
       label: 'Notifications',
       icon: Bell,
-      badgeCount: unreadNotificationsCount, 
+      badgeCount: unreadNotificationsCount,
+      allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK],
     },
-    { href: '/admin/settings', label: 'Settings', icon: Settings },
+    { href: '/admin/settings', label: 'Settings', icon: Settings, allowedRoles: [Role.ADMIN] },
   ];
 
   const isActive = (href: string, isExact: boolean = true) => {
@@ -127,8 +145,15 @@ export default function AdminLayout({
       });
     }
   };
+  
+  const handleLogout = () => {
+    signOut({ callbackUrl: '/' }); // Redirect to homepage after logout
+    setIsSheetOpen(false);
+  };
 
-  const renderNavItems = () => navItems.map((item) =>
+  const renderNavItems = () => navItems
+    .filter(item => userRole && item.allowedRoles.includes(userRole)) // Filter based on role
+    .map((item) =>
     item.isAccordion && item.subItems ? (
       <Accordion key={item.label} type="single" collapsible className="w-full" defaultValue={isActive(item.href, false) ? item.label : undefined}>
         <AccordionItem value={item.label} className="border-b-0">
@@ -137,9 +162,9 @@ export default function AdminLayout({
               "w-full justify-between text-left hover:no-underline rounded-md px-3 py-2 text-sm font-medium",
               "hover:bg-muted/80",
               isActive(item.href, false) && !item.subItems?.some(sub => isActive(sub.href))
-                ? "bg-muted text-primary hover:text-primary" 
+                ? "bg-muted text-primary hover:text-primary"
                 : "text-foreground/80 hover:text-foreground",
-              item.subItems?.some(sub => isActive(sub.href)) && "text-foreground/80 hover:text-foreground" 
+              item.subItems?.some(sub => isActive(sub.href)) && "text-foreground/80 hover:text-foreground"
             )}
           >
             <div className="flex items-center">
@@ -149,7 +174,9 @@ export default function AdminLayout({
           </AccordionTrigger>
           <AccordionContent className="pt-1 pb-0 pl-4">
             <div className="space-y-1">
-            {item.subItems.map((subItem) => (
+            {item.subItems
+              .filter(subItem => userRole && subItem.allowedRoles.includes(userRole)) // Filter sub-items
+              .map((subItem) => (
               <Button
                 key={subItem.label}
                 variant="ghost"
@@ -201,6 +228,24 @@ export default function AdminLayout({
     )
   );
 
+  if (status === 'loading') {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-muted/40">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">Loading admin area...</p>
+      </div>
+    );
+  }
+
+  if (!session || !userRole || !allowedAdminRoles.includes(userRole)) {
+    // This case should be handled by the useEffect redirect,
+    // but as a fallback or if redirect hasn't happened yet:
+    return (
+         <div className="flex justify-center items-center min-h-screen bg-muted/40">
+            <p className="text-lg text-destructive">Access Denied. Redirecting...</p>
+         </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-muted/40">
@@ -215,7 +260,7 @@ export default function AdminLayout({
           {renderNavItems()}
         </nav>
         <div className="p-4 border-t mt-auto">
-          <Button variant="outline" className="w-full" onClick={() => alert('Admin Logout clicked!')}>
+          <Button variant="outline" className="w-full" onClick={handleLogout}>
             <LogOut className="mr-2 h-4 w-4" />
             Logout
           </Button>
@@ -246,7 +291,7 @@ export default function AdminLayout({
                     {renderNavItems()}
                 </nav>
                  <div className="p-4 border-t mt-auto">
-                  <Button variant="outline" className="w-full" onClick={() => { alert('Admin Logout clicked!'); setIsSheetOpen(false); }}>
+                  <Button variant="outline" className="w-full" onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout
                   </Button>
@@ -255,8 +300,8 @@ export default function AdminLayout({
           </Sheet>
 
           <div className="md:hidden text-xl font-bold text-primary">
+             {/* Placeholder for mobile title if needed */}
           </div>
-
 
           <div className="flex items-center gap-2 ml-auto">
             <div className="hidden sm:flex items-center gap-2">
@@ -265,7 +310,7 @@ export default function AdminLayout({
                   <Input
                     type="search"
                     placeholder="Search admin..."
-                    className="h-9 w-40 md:w-56 text-sm" 
+                    className="h-9 w-40 md:w-56 text-sm"
                     value={adminSearchTerm}
                     onChange={(e) => setAdminSearchTerm(e.target.value)}
                     onKeyDown={handleAdminSearchSubmit}
@@ -288,7 +333,7 @@ export default function AdminLayout({
                 </Button>
               )}
             </div>
-            
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
@@ -297,12 +342,16 @@ export default function AdminLayout({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Admin Account</DropdownMenuLabel>
+                <DropdownMenuLabel>
+                  {session?.user?.name || session?.user?.email || 'Admin Account'} ({userRole})
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/admin/profile">Profile</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => alert('Admin Logout clicked!')}>Logout</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" /> Logout
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
