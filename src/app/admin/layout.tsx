@@ -15,9 +15,9 @@ import {
   Shapes,
   Search,
   Menu,
-  X,
+  X, // Correctly import X
   LogOut,
-  Truck as DeliveryIcon, // Added DeliveryIcon
+  Truck as DeliveryIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"; // Removed SheetClose as it's not typically used directly like this for the icon
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { usePathname, useRouter } from 'next/navigation';
@@ -70,18 +70,18 @@ export default function AdminLayout({
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const userRole = session?.user?.role;
-  const allowedAdminAccessRoles: Role[] = [Role.ADMIN, Role.SELLER, Role.STOCK, Role.DELIVERY]; // Added DELIVERY
+  const allowedAdminAccessRoles: Role[] = [Role.ADMIN, Role.SELLER, Role.STOCK, Role.DELIVERY]; 
 
   useEffect(() => {
     if (status === 'loading') return; 
-    if (status === 'unauthenticated' || !session || !userRole || !allowedAdminAccessRoles.includes(userRole)) {
+    if (status === 'unauthenticated' || !session || !userRole || !allowedAdminAccessRoles.includes(userRole as Role)) {
       router.push('/auth?error=AccessDeniedAdmin'); 
     }
   }, [session, status, userRole, router, allowedAdminAccessRoles]);
 
 
   useEffect(() => {
-    if (!session || !userRole || !allowedAdminAccessRoles.includes(userRole)) return;
+    if (!session || !userRole || !allowedAdminAccessRoles.includes(userRole as Role)) return;
 
     const fetchUnreadCount = async () => {
       try {
@@ -112,8 +112,8 @@ export default function AdminLayout({
       ],
       allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK], 
     },
-    { href: '/admin/sales', label: 'Order Management', icon: DollarSign, allowedRoles: [Role.ADMIN, Role.SELLER] }, // Renamed Sales to Order Management
-    { href: '/admin/delivery', label: 'Delivery Management', icon: DeliveryIcon, allowedRoles: [Role.ADMIN, Role.DELIVERY] }, // New Delivery Management link
+    { href: '/admin/sales', label: 'Order Management', icon: DollarSign, allowedRoles: [Role.ADMIN, Role.SELLER] },
+    { href: '/admin/delivery', label: 'Delivery Management', icon: DeliveryIcon, allowedRoles: [Role.ADMIN, Role.DELIVERY] }, 
     { href: '/admin/users', label: 'Users', icon: Users, allowedRoles: [Role.ADMIN] },
     { href: '/admin/analytics', label: 'Analytics', icon: LineChart, allowedRoles: [Role.ADMIN] },
     {
@@ -153,7 +153,7 @@ export default function AdminLayout({
   };
 
   const renderNavItems = () => navItems
-    .filter(item => userRole && item.allowedRoles.includes(userRole)) 
+    .filter(item => userRole && item.allowedRoles.includes(userRole as Role)) 
     .map((item) =>
     item.isAccordion && item.subItems ? (
       <Accordion key={item.label} type="single" collapsible className="w-full" defaultValue={isActive(item.href, false) ? item.label : undefined}>
@@ -176,7 +176,7 @@ export default function AdminLayout({
           <AccordionContent className="pt-1 pb-0 pl-4">
             <div className="space-y-1">
             {item.subItems
-              .filter(subItem => userRole && subItem.allowedRoles.includes(userRole)) 
+              .filter(subItem => userRole && subItem.allowedRoles.includes(userRole as Role)) 
               .map((subItem) => (
               <Button
                 key={subItem.label}
@@ -238,7 +238,7 @@ export default function AdminLayout({
     );
   }
 
-  if (!session || !userRole || !allowedAdminAccessRoles.includes(userRole)) {
+  if (!session || !userRole || !allowedAdminAccessRoles.includes(userRole as Role)) {
     return (
          <div className="flex justify-center items-center min-h-screen bg-muted/40">
             <p className="text-lg text-destructive">Access Denied. Redirecting...</p>
@@ -282,7 +282,7 @@ export default function AdminLayout({
                      <SheetTitle>Admin Menu</SheetTitle>
                    </Link>
                     <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => setIsSheetOpen(false)}>
-                        <XIcon className="h-5 w-5" />
+                        <X className="h-5 w-5" /> {/* Use X here */}
                         <span className="sr-only">Close menu</span>
                     </Button>
                 </SheetHeader>
@@ -316,7 +316,7 @@ export default function AdminLayout({
                     autoFocus
                   />
                   <Button variant="ghost" size="icon" onClick={() => { setIsSearchVisible(false); setAdminSearchTerm(''); }}>
-                    <X className="h-5 w-5 text-muted-foreground" />
+                    <X className="h-5 w-5 text-muted-foreground" /> {/* Use X here */}
                     <span className="sr-only">Close search</span>
                   </Button>
                 </>
