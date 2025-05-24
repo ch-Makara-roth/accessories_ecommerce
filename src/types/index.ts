@@ -1,9 +1,10 @@
 
-import type { Role, OrderStatus as PrismaOrderStatusEnum } from '@prisma/client'; // Import Prisma enum
+import { Role as PrismaRole, OrderStatus as PrismaOrderStatus } from '@prisma/client';
 import type { ObjectId } from 'mongodb';
 
-// Re-export Prisma's OrderStatus enum for consistent use
-export { Role, PrismaOrderStatusEnum as OrderStatus };
+// Re-export Prisma's enums. This makes them available as both values and types.
+export { PrismaRole as Role, PrismaOrderStatus as OrderStatus };
+
 
 export type Category = {
   id: string;
@@ -25,7 +26,6 @@ export type Product = {
   reviewCount?: number;
   description: string;
   image: string;
-
   type?: string;
   color?: string;
   material?: string;
@@ -34,13 +34,11 @@ export type Product = {
   dataAiHint?: string;
   stock?: number;
   status?: 'Active' | 'Draft' | 'Archived' | 'Scheduled';
-
   categoryId?: string | null;
   category?: Category | null;
   createdAt?: Date;
   updatedAt?: Date;
 };
-
 
 export interface CartItem {
   product: Product;
@@ -57,13 +55,12 @@ export type OrderItemType = {
   updatedAt?: Date;
 };
 
-// OrderType now uses the re-exported PrismaOrderStatusEnum
 export type OrderType = {
   id: string;
   userId: string;
   user?: { name?: string | null; email?: string | null };
   totalAmount: number;
-  status: PrismaOrderStatusEnum; // Use the imported enum type
+  status: PrismaOrderStatus; // Use the re-exported enum type
   shippingAddress?: any;
   createdAt: Date;
   updatedAt: Date;
@@ -81,12 +78,12 @@ export type AdminNotification = {
 };
 
 export type User = {
-  id: string;
+  id:string;
   name?: string | null;
   email?: string | null;
   emailVerified?: Date | string | null;
   image?: string | null;
-  role?: Role;
+  role?: PrismaRole; // Use the re-exported enum type
   createdAt?: Date | string;
   updatedAt?: Date | string;
 };
