@@ -22,8 +22,8 @@ export async function GET(req: NextRequest) {
         emailVerified: true,
         image: true,
         role: true,
-        createdAt: true,
-        updatedAt: true,
+        createdAt: true, // Include createdAt
+        updatedAt: true, // Include updatedAt for completeness
       },
       orderBy: {
         createdAt: 'desc',
@@ -36,3 +36,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch users', details: errorMessage }, { status: 500 });
   }
 }
+
