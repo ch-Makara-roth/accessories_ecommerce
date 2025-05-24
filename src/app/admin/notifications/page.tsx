@@ -23,6 +23,10 @@ export default function AdminNotificationsPage() {
   const { toast } = useToast();
 
   const fetchNotifications = useCallback(async () => {
+    // For polling, we don't want to set isLoading to true every time,
+    // only on initial load or explicit refresh.
+    // For this example, we'll keep it simple and set it,
+    // but a more advanced solution might avoid this for background polls.
     setIsLoading(true);
     setError(null);
     try {
@@ -36,6 +40,8 @@ export default function AdminNotificationsPage() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       setError(errorMessage);
+      // Avoid toasting for background poll failures unless it's a persistent issue.
+      // For now, we'll keep it for simplicity.
       toast({ variant: 'destructive', title: 'Error Loading Notifications', description: errorMessage });
     } finally {
       setIsLoading(false);
@@ -43,13 +49,16 @@ export default function AdminNotificationsPage() {
   }, [toast]);
 
   useEffect(() => {
-    fetchNotifications();
+    fetchNotifications(); // Fetch immediately on mount
+    const intervalId = setInterval(fetchNotifications, 30000); // Poll every 30 seconds
+
+    return () => clearInterval(intervalId); // Cleanup interval on unmount
   }, [fetchNotifications]);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const renderContent = () => {
-    if (isLoading) {
+    if (isLoading && notifications.length === 0) { // Show loader only if no data yet
       return (
         <div className="flex justify-center items-center py-10">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -57,7 +66,7 @@ export default function AdminNotificationsPage() {
         </div>
       );
     }
-    if (error) {
+    if (error && notifications.length === 0) { // Show error only if no data yet
       return <p className="text-destructive text-center py-4">Error: {error}</p>;
     }
     if (notifications.length === 0) {

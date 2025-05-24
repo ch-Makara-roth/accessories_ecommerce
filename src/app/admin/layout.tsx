@@ -15,9 +15,10 @@ import {
   Shapes,
   Search,
   Menu,
-  X, // Correctly import X
+  X,
   LogOut,
   Truck as DeliveryIcon,
+  Loader2, // Keep Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -35,15 +36,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"; // Removed SheetClose as it's not typically used directly like this for the icon
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect, type KeyboardEvent } from 'react';
 import type { AdminNotification } from '@/types';
 import { useSession, signOut } from 'next-auth/react';
-import { Loader2 } from 'lucide-react';
-import { Role } from '@prisma/client'; 
+import { Role } from '@prisma/client';
 
 interface AdminNavItem {
   href: string;
@@ -52,7 +52,7 @@ interface AdminNavItem {
   subItems?: AdminNavItem[];
   isAccordion?: boolean;
   badgeCount?: number;
-  allowedRoles: Role[]; 
+  allowedRoles: Role[];
 }
 
 export default function AdminLayout({
@@ -70,14 +70,14 @@ export default function AdminLayout({
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const userRole = session?.user?.role;
-  const allowedAdminAccessRoles: Role[] = [Role.ADMIN, Role.SELLER, Role.STOCK, Role.DELIVERY]; 
+  const allowedAdminAccessRoles: Role[] = [Role.ADMIN, Role.SELLER, Role.STOCK, Role.DELIVERY];
 
   useEffect(() => {
-    if (status === 'loading') return; 
+    if (status === 'loading') return;
     if (status === 'unauthenticated' || !session || !userRole || !allowedAdminAccessRoles.includes(userRole as Role)) {
-      router.push('/auth?error=AccessDeniedAdmin'); 
+      router.push('/auth?error=AccessDeniedAdmin');
     }
-  }, [session, status, userRole, router, allowedAdminAccessRoles]);
+  }, [session, status, userRole, router]);
 
 
   useEffect(() => {
@@ -96,8 +96,12 @@ export default function AdminLayout({
         console.error('Error fetching unread notifications count for admin layout:', error);
       }
     };
-    fetchUnreadCount();
-  }, [session, userRole, allowedAdminAccessRoles]);
+
+    fetchUnreadCount(); // Fetch immediately on mount
+    const intervalId = setInterval(fetchUnreadCount, 30000); // Poll every 30 seconds
+
+    return () => clearInterval(intervalId); // Cleanup interval on unmount
+  }, [session, userRole]);
 
   const navItems: AdminNavItem[] = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK, Role.DELIVERY] },
@@ -110,10 +114,10 @@ export default function AdminLayout({
         { href: '/admin/products', label: 'Product List', icon: List, allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK] },
         { href: '/admin/products/categories', label: 'Categories', icon: Shapes, allowedRoles: [Role.ADMIN, Role.SELLER] },
       ],
-      allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK], 
+      allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK],
     },
     { href: '/admin/sales', label: 'Order Management', icon: DollarSign, allowedRoles: [Role.ADMIN, Role.SELLER] },
-    { href: '/admin/delivery', label: 'Delivery Management', icon: DeliveryIcon, allowedRoles: [Role.ADMIN, Role.DELIVERY] }, 
+    { href: '/admin/delivery', label: 'Delivery Management', icon: DeliveryIcon, allowedRoles: [Role.ADMIN, Role.DELIVERY] },
     { href: '/admin/users', label: 'Users', icon: Users, allowedRoles: [Role.ADMIN] },
     { href: '/admin/analytics', label: 'Analytics', icon: LineChart, allowedRoles: [Role.ADMIN] },
     {
@@ -134,7 +138,7 @@ export default function AdminLayout({
   };
 
   useEffect(() => {
-    setIsSheetOpen(false);
+    setIsSheetOpen(false); // Close sheet on route change
   }, [pathname]);
 
   const handleAdminSearchSubmit = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -144,16 +148,18 @@ export default function AdminLayout({
         title: 'Admin Search (Placeholder)',
         description: `Searched for: "${adminSearchTerm}". Implement actual search logic.`,
       });
+      // setIsSearchVisible(false); // Optionally close search after submit
+      // setAdminSearchTerm('');
     }
   };
-  
+
   const handleLogout = () => {
-    signOut({ callbackUrl: '/' }); 
+    signOut({ callbackUrl: '/' });
     setIsSheetOpen(false);
   };
 
   const renderNavItems = () => navItems
-    .filter(item => userRole && item.allowedRoles.includes(userRole as Role)) 
+    .filter(item => userRole && item.allowedRoles.includes(userRole as Role))
     .map((item) =>
     item.isAccordion && item.subItems ? (
       <Accordion key={item.label} type="single" collapsible className="w-full" defaultValue={isActive(item.href, false) ? item.label : undefined}>
@@ -176,7 +182,7 @@ export default function AdminLayout({
           <AccordionContent className="pt-1 pb-0 pl-4">
             <div className="space-y-1">
             {item.subItems
-              .filter(subItem => userRole && subItem.allowedRoles.includes(userRole as Role)) 
+              .filter(subItem => userRole && subItem.allowedRoles.includes(userRole as Role))
               .map((subItem) => (
               <Button
                 key={subItem.label}
@@ -278,11 +284,13 @@ export default function AdminLayout({
             </SheetTrigger>
             <SheetContent side="left" className="w-3/4 max-w-xs p-0 flex flex-col">
                 <SheetHeader className="flex flex-row items-center justify-between h-16 border-b px-4 py-2">
-                   <Link href="/admin" onClick={() => setIsSheetOpen(false)}>
-                     <SheetTitle>Admin Menu</SheetTitle>
-                   </Link>
+                   <SheetTitle>
+                      <Link href="/admin" onClick={() => setIsSheetOpen(false)}>
+                        Admin Menu
+                      </Link>
+                    </SheetTitle>
                     <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => setIsSheetOpen(false)}>
-                        <X className="h-5 w-5" /> {/* Use X here */}
+                        <X className="h-5 w-5" />
                         <span className="sr-only">Close menu</span>
                     </Button>
                 </SheetHeader>
@@ -316,7 +324,7 @@ export default function AdminLayout({
                     autoFocus
                   />
                   <Button variant="ghost" size="icon" onClick={() => { setIsSearchVisible(false); setAdminSearchTerm(''); }}>
-                    <X className="h-5 w-5 text-muted-foreground" /> {/* Use X here */}
+                    <X className="h-5 w-5 text-muted-foreground" />
                     <span className="sr-only">Close search</span>
                   </Button>
                 </>
