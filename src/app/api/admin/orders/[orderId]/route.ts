@@ -4,11 +4,20 @@ import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { Role, OrderStatus } from '@prisma/client'; // Import OrderStatus enum
+import { Role } from '@prisma/client'; // Role enum is fine for session checks
 import { z } from 'zod';
 
+// Define OrderStatus values explicitly for Zod
+const OrderStatusValues = [
+  "Pending",
+  "Processing",
+  "Shipped",
+  "Delivered",
+  "Cancelled",
+] as const; // Use "as const" for stricter typing with z.enum
+
 const updateOrderStatusSchema = z.object({
-  status: z.nativeEnum(OrderStatus),
+  status: z.enum(OrderStatusValues),
 });
 
 export async function PUT(
@@ -16,7 +25,7 @@ export async function PUT(
   { params }: { params: { orderId: string } }
 ) {
   const session = await getServerSession(authOptions);
-  const { orderId } = params;
+  const { orderId } = params; // This is the standard way to get route params in App Router API routes
 
   if (!session || !session.user || ![Role.ADMIN, Role.SELLER].includes(session.user.role as Role)) {
     return NextResponse.json({ error: 'Unauthorized. Admin or Seller access required.' }, { status: 403 });
@@ -37,6 +46,7 @@ export async function PUT(
     const validation = updateOrderStatusSchema.safeParse(body);
 
     if (!validation.success) {
+      console.error(`API PUT /api/admin/orders/${orderId}: Zod validation failed. Errors:`, validation.error.flatten().fieldErrors);
       return NextResponse.json({ error: 'Invalid status provided.', details: validation.error.flatten().fieldErrors }, { status: 400 });
     }
 
@@ -44,7 +54,7 @@ export async function PUT(
 
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
-      data: { status: newStatus },
+      data: { status: newStatus }, // Prisma client will use the string value here, which is correct
       include: {
         user: { select: { name: true, email: true } },
         orderItems: { include: { product: { select: { name: true, image: true } } } },
@@ -54,10 +64,17 @@ export async function PUT(
     return NextResponse.json(updatedOrder, { status: 200 });
 
   } catch (error: any) {
-    // Enhanced error logging
     console.error(`API PUT /api/admin/orders/${orderId}: Error during status update. Raw error object:`);
     try {
-      console.error(JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      // Attempt to log more details from the error object
+      const errorDetailsToLog = {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        code: error.code, // For Prisma errors
+        meta: error.meta, // For Prisma errors
+      };
+      console.error(JSON.stringify(errorDetailsToLog, null, 2));
     } catch (stringifyError) {
       console.error("Could not stringify the raw error object. Fallback to default logging:", error);
     }
@@ -72,7 +89,6 @@ export async function PUT(
       } else if (error.message) { // Standard Error object
         errorMessage = error.message;
       } else {
-        // Try to stringify if it's an object but not a standard error or Prisma error
         try {
           errorMessage = `Non-standard error object: ${JSON.stringify(error)}`;
         } catch (e) {
@@ -87,4 +103,3 @@ export async function PUT(
     return NextResponse.json({ error: 'Failed to update order status', details: errorMessage }, { status: statusCode });
   }
 }
-
