@@ -13,8 +13,8 @@ import {
 } from '@/components/ui/table';
 import { Package, CheckCircle, Truck, Loader2 } from 'lucide-react';
 import type { OrderType } from '@/types';
-import { OrderStatus } from '@prisma/client'; // Import OrderStatus directly
-import { Role } from '@prisma/client';
+// Removed: import { OrderStatus } from '@prisma/client'; // No longer needed for runtime checks here
+import { Role } from '@prisma/client'; // Role is still needed for session checks
 import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from 'next-auth/react';
@@ -54,7 +54,7 @@ export default function AdminOrderManagementPage() {
     }
   }, [session, fetchOrdersForAdmin]);
 
-  const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderType['status']) => {
     setUpdatingOrderId(orderId);
     try {
       const response = await fetch(`/api/admin/orders/${orderId}`, {
@@ -78,11 +78,11 @@ export default function AdminOrderManagementPage() {
 
   const getStatusColor = (status: OrderType['status']) => {
     switch (status) {
-      case OrderStatus.Pending: return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300';
-      case OrderStatus.Processing: return 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300';
-      case OrderStatus.Shipped: return 'bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300';
-      case OrderStatus.Delivered: return 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300';
-      case OrderStatus.Cancelled: return 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300';
+      case 'Pending': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300';
+      case 'Processing': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300';
+      case 'Shipped': return 'bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300';
+      case 'Delivered': return 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300';
+      case 'Cancelled': return 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300';
       default: return 'bg-gray-100 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300';
     }
   };
@@ -137,23 +137,23 @@ export default function AdminOrderManagementPage() {
                   <Loader2 className="h-4 w-4 animate-spin text-primary inline-block" />
                 ) : (
                   <>
-                    {order.status === OrderStatus.Pending && (
+                    {order.status === 'Pending' && (
                       <Button
                         size="sm"
                         variant="outline"
                         className="text-xs border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700"
-                        onClick={() => handleUpdateOrderStatus(order.id, OrderStatus.Processing)}
+                        onClick={() => handleUpdateOrderStatus(order.id, 'Processing')}
                         disabled={updatingOrderId === order.id}
                       >
                         <CheckCircle className="mr-1.5 h-3.5 w-3.5" /> Accept
                       </Button>
                     )}
-                    {order.status === OrderStatus.Processing && (
+                    {order.status === 'Processing' && (
                       <Button
                         size="sm"
                         variant="outline"
                         className="text-xs border-blue-500 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                        onClick={() => handleUpdateOrderStatus(order.id, OrderStatus.Shipped)}
+                        onClick={() => handleUpdateOrderStatus(order.id, 'Shipped')}
                         disabled={updatingOrderId === order.id}
                       >
                          <Truck className="mr-1.5 h-3.5 w-3.5" /> Mark Shipped

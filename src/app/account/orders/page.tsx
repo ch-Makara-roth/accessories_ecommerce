@@ -7,7 +7,7 @@ import { Package, FileText, RotateCw, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { OrderType, OrderItemType } from '@/types';
-import { OrderStatus } from '@prisma/client'; // Import OrderStatus directly
+// Removed: import { OrderStatus } from '@/types'; // No longer needed for runtime checks here
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { format } from 'date-fns';
@@ -49,11 +49,11 @@ export default function CustomerOrdersPage() {
 
   const getStatusColor = (status: OrderType['status']) => {
     switch (status) {
-      case OrderStatus.Pending: return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300';
-      case OrderStatus.Processing: return 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300';
-      case OrderStatus.Shipped: return 'bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300';
-      case OrderStatus.Delivered: return 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300';
-      case OrderStatus.Cancelled: return 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300';
+      case 'Pending': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300';
+      case 'Processing': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300';
+      case 'Shipped': return 'bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300';
+      case 'Delivered': return 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300';
+      case 'Cancelled': return 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300';
       default: return 'bg-gray-100 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300';
     }
   };
@@ -129,10 +129,10 @@ export default function CustomerOrdersPage() {
                     <Button variant="outline" size="sm">
                         <FileText className="mr-1.5 h-4 w-4" /> View Invoice
                     </Button>
-                    {order.status !== OrderStatus.Delivered && order.status !== OrderStatus.Cancelled && (
+                    {order.status !== 'Delivered' && order.status !== 'Cancelled' && (
                         <Button variant="outline" size="sm">Track Order</Button>
                     )}
-                    {order.status === OrderStatus.Delivered && (
+                    {order.status === 'Delivered' && (
                         <Button variant="secondary" size="sm">
                             <RotateCw className="mr-1.5 h-4 w-4" /> Reorder
                         </Button>
