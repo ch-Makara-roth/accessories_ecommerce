@@ -42,13 +42,10 @@ export async function PUT(
 
     const { status: newStatus } = validation.data;
 
-    // Optional: Add logic to validate status transitions if needed
-    // e.g., an order cannot go from "Shipped" back to "Pending" by seller action.
-
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
       data: { status: newStatus },
-      include: { // Return the updated order with some details
+      include: {
         user: { select: { name: true, email: true } },
         orderItems: { include: { product: { select: { name: true, image: true } } } },
       }
@@ -57,11 +54,37 @@ export async function PUT(
     return NextResponse.json(updatedOrder, { status: 200 });
 
   } catch (error: any) {
-    console.error(`API PUT /api/admin/orders/${orderId}: Error updating order status:`, error);
-    if (error.code === 'P2025') { // Record to update not found
-      return NextResponse.json({ error: 'Order not found.' }, { status: 404 });
+    // Enhanced error logging
+    console.error(`API PUT /api/admin/orders/${orderId}: Error during status update. Raw error object:`);
+    try {
+      console.error(JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    } catch (stringifyError) {
+      console.error("Could not stringify the raw error object. Fallback to default logging:", error);
     }
-    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-    return NextResponse.json({ error: 'Failed to update order status', details: errorMessage }, { status: 500 });
+
+    let errorMessage = 'An unexpected error occurred while updating order status.';
+    let statusCode = 500;
+
+    if (error && typeof error === 'object') {
+      if (error.code === 'P2025') { // Prisma: Record to update not found
+        errorMessage = 'Order not found.';
+        statusCode = 404;
+      } else if (error.message) { // Standard Error object
+        errorMessage = error.message;
+      } else {
+        // Try to stringify if it's an object but not a standard error or Prisma error
+        try {
+          errorMessage = `Non-standard error object: ${JSON.stringify(error)}`;
+        } catch (e) {
+          errorMessage = 'An unidentifiable error object was caught and could not be stringified.';
+        }
+      }
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
+    
+    console.error(`API PUT /api/admin/orders/${orderId}: Processed error message for client: ${errorMessage}`);
+    return NextResponse.json({ error: 'Failed to update order status', details: errorMessage }, { status: statusCode });
   }
 }
+
