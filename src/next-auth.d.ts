@@ -1,13 +1,14 @@
 
-import type { DefaultSession, User as NextAuthUser, Role as NextAuthRole } from 'next-auth'; // Import Role from next-auth if it exists
+import type { DefaultSession, User as NextAuthUser } from 'next-auth';
 import type { JWT as NextAuthJWT } from 'next-auth/jwt';
 
-// Define your custom Role enum
+// Define your custom Role enum matching Prisma
 enum Role {
   CUSTOMER = 'CUSTOMER',
   ADMIN = 'ADMIN',
   SELLER = 'SELLER',
   STOCK = 'STOCK',
+  DELIVERY = 'DELIVERY', // Added DELIVERY role
 }
 
 declare module 'next-auth' {

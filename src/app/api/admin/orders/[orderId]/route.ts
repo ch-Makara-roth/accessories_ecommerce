@@ -4,11 +4,10 @@ import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { Role, OrderStatus as PrismaOrderStatusEnum } from '@prisma/client'; // Import PrismaOrderStatusEnum
+import { Role, OrderStatus as PrismaOrderStatusEnum } from '@prisma/client';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 
-// Explicitly define the possible string values for OrderStatus
 const orderStatusValues = [
   "Pending",
   "Processing",
@@ -28,8 +27,9 @@ export async function PUT(
   const session = await getServerSession(authOptions);
   const { orderId } = params;
 
-  if (!session || !session.user || ![Role.ADMIN, Role.SELLER].includes(session.user.role as Role)) {
-    return NextResponse.json({ error: 'Unauthorized. Admin or Seller access required.' }, { status: 403 });
+  // Updated: Allow DELIVERY role to also update status
+  if (!session || !session.user || ![Role.ADMIN, Role.SELLER, Role.DELIVERY].includes(session.user.role as Role)) {
+    return NextResponse.json({ error: 'Unauthorized. Admin, Seller, or Delivery access required.' }, { status: 403 });
   }
 
   if (!orderId) {
@@ -51,11 +51,20 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid status provided.', details: validation.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    const { status: newStatus } = validation.data; // newStatus is now a validated string like "Shipped"
+    const { status: newStatus } = validation.data;
+
+    // Role-specific status update restrictions
+    const userRole = session.user.role as Role;
+    if (userRole === Role.SELLER && !['Processing', 'Shipped'].includes(newStatus)) {
+        return NextResponse.json({ error: 'Sellers can only update status to Processing or Shipped.' }, { status: 403 });
+    }
+    if (userRole === Role.DELIVERY && newStatus !== 'Delivered') {
+        return NextResponse.json({ error: 'Delivery personnel can only update status to Delivered.' }, { status: 403 });
+    }
+    // Admins can update to any status handled by the schema.
 
     let updatedOrder;
 
-    // Use string literal for comparison
     if (newStatus === "Shipped") {
       const orderToShip = await prisma.order.findUnique({
         where: { id: orderId },
@@ -74,10 +83,9 @@ export async function PUT(
         return NextResponse.json({ error: 'Order not found to mark as shipped.' }, { status: 404 });
       }
       
-      // Optional: Check if current status allows moving to Shipped (e.g., from Processing)
-      // For example, if orderToShip.status !== "Processing"
-      //   return NextResponse.json({ error: `Order cannot be marked as Shipped from current status: ${orderToShip.status}` }, { status: 400 });
-      // }
+      if (orderToShip.status !== PrismaOrderStatusEnum.Processing) {
+        return NextResponse.json({ error: `Order cannot be marked as Shipped from current status: ${orderToShip.status}. Must be 'Processing'.` }, { status: 400 });
+      }
 
       const productUpdates: Prisma.PrismaPromise<any>[] = [];
       for (const item of orderToShip.orderItems) {
@@ -94,7 +102,7 @@ export async function PUT(
 
       const orderStatusUpdateOperation = prisma.order.update({
         where: { id: orderId },
-        data: { status: newStatus as PrismaOrderStatusEnum }, // Cast to Prisma enum type for the database
+        data: { status: newStatus as PrismaOrderStatusEnum },
         include: {
           user: { select: { name: true, email: true } },
           orderItems: { include: { product: { select: { id:true, name: true, image: true, stock: true } } } },
@@ -107,7 +115,7 @@ export async function PUT(
     } else {
       updatedOrder = await prisma.order.update({
         where: { id: orderId },
-        data: { status: newStatus as PrismaOrderStatusEnum }, // Cast to Prisma enum type for the database
+        data: { status: newStatus as PrismaOrderStatusEnum },
         include: {
           user: { select: { name: true, email: true } },
           orderItems: { include: { product: { select: { id: true, name: true, image: true, stock: true } } } },
@@ -118,12 +126,15 @@ export async function PUT(
     return NextResponse.json(updatedOrder, { status: 200 });
 
   } catch (error: any) {
+    let errorMessage = 'An unexpected error occurred while updating order status.';
+    let statusCode = 500;
+
     console.error(`API PUT /api/admin/orders/${orderId}: Error during status update. Raw error object:`);
     let errorDetailsToLog: any = { message: error.message };
     if (error.stack) errorDetailsToLog.stack = error.stack;
     if (error.name) errorDetailsToLog.name = error.name;
-    if (error.code) errorDetailsToLog.code = error.code; // For Prisma errors
-    if (error.meta) errorDetailsToLog.meta = error.meta; // For Prisma errors
+    if (error.code) errorDetailsToLog.code = error.code; 
+    if (error.meta) errorDetailsToLog.meta = error.meta; 
 
     try {
         console.error(JSON.stringify(errorDetailsToLog, null, 2));
@@ -131,9 +142,6 @@ export async function PUT(
         console.error("Could not stringify the raw error object. Fallback to default logging:", error);
     }
     
-    let errorMessage = 'An unexpected error occurred while updating order status.';
-    let statusCode = 500;
-
     if (error && typeof error === 'object') {
       if ((error as any).code === 'P2025') { 
         errorMessage = 'Order or related product not found during update.';
@@ -141,15 +149,8 @@ export async function PUT(
       } else if ((error as any).message?.includes("Insufficient stock")) {
         errorMessage = (error as any).message;
         statusCode = 400; 
-      }
-      else if ((error as any).message) { 
+      } else if ((error as any).message) { 
         errorMessage = (error as any).message;
-      } else {
-        try {
-          errorMessage = `Non-standard error object: ${JSON.stringify(error)}`;
-        } catch (e) {
-          errorMessage = 'An unidentifiable error object was caught and could not be stringified.';
-        }
       }
     } else if (typeof error === 'string') {
       errorMessage = error;

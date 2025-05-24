@@ -17,7 +17,7 @@ import {
   Menu,
   X,
   LogOut,
-  ChevronDown
+  Truck as DeliveryIcon, // Added DeliveryIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { usePathname, useRouter } from 'next/navigation';
@@ -70,7 +70,7 @@ export default function AdminLayout({
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const userRole = session?.user?.role;
-  const allowedAdminAccessRoles: Role[] = [Role.ADMIN, Role.SELLER, Role.STOCK];
+  const allowedAdminAccessRoles: Role[] = [Role.ADMIN, Role.SELLER, Role.STOCK, Role.DELIVERY]; // Added DELIVERY
 
   useEffect(() => {
     if (status === 'loading') return; 
@@ -100,7 +100,7 @@ export default function AdminLayout({
   }, [session, userRole, allowedAdminAccessRoles]);
 
   const navItems: AdminNavItem[] = [
-    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK] },
+    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK, Role.DELIVERY] },
     {
       href: '/admin/products',
       label: 'Products',
@@ -112,15 +112,16 @@ export default function AdminLayout({
       ],
       allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK], 
     },
-    { href: '/admin/sales', label: 'Sales', icon: DollarSign, allowedRoles: [Role.ADMIN, Role.SELLER] },
-    { href: '/admin/users', label: 'Users', icon: Users, allowedRoles: [Role.ADMIN] }, // Changed label to Users
+    { href: '/admin/sales', label: 'Order Management', icon: DollarSign, allowedRoles: [Role.ADMIN, Role.SELLER] }, // Renamed Sales to Order Management
+    { href: '/admin/delivery', label: 'Delivery Management', icon: DeliveryIcon, allowedRoles: [Role.ADMIN, Role.DELIVERY] }, // New Delivery Management link
+    { href: '/admin/users', label: 'Users', icon: Users, allowedRoles: [Role.ADMIN] },
     { href: '/admin/analytics', label: 'Analytics', icon: LineChart, allowedRoles: [Role.ADMIN] },
     {
       href: '/admin/notifications',
       label: 'Notifications',
       icon: Bell,
       badgeCount: unreadNotificationsCount,
-      allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK],
+      allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK, Role.DELIVERY],
     },
     { href: '/admin/settings', label: 'Settings', icon: Settings, allowedRoles: [Role.ADMIN] },
   ];
@@ -281,7 +282,7 @@ export default function AdminLayout({
                      <SheetTitle>Admin Menu</SheetTitle>
                    </Link>
                     <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => setIsSheetOpen(false)}>
-                        <X className="h-5 w-5" />
+                        <XIcon className="h-5 w-5" />
                         <span className="sr-only">Close menu</span>
                     </Button>
                 </SheetHeader>
