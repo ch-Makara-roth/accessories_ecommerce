@@ -1,96 +1,190 @@
 
-// src/app/admin/sales/page.tsx
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DollarSign, ShoppingBag, Users, BarChart3, ListOrdered } from 'lucide-react';
+'use client';
 
-export default function AdminSalesPage() {
-  const salesStats = [
-    { title: 'Total Revenue', value: '$45,231.89', icon: DollarSign, change: '+20.1% from last month' },
-    { title: 'Total Sales', value: '+1,234', icon: ShoppingBag, change: '+180.1% from last month' },
-    { title: 'Average Order Value', value: '$87.50', icon: DollarSign, change: '+5.2% from last month' },
-    { title: 'New Customers', value: '+573', icon: Users, change: '+20 since last hour' },
-  ];
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { DollarSign, Package, UserCircle, CalendarDays, Truck, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import type { OrderType, OrderItemType } from '@/types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { useSession } from 'next-auth/react';
+import { Role, OrderStatus } from '@prisma/client';
+import { format } from 'date-fns';
+import Image from 'next/image';
+import Link from 'next/link';
+
+export default function AdminOrderManagementPage() {
+  const { data: session } = useSession();
+  const [orders, setOrders] = useState<OrderType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+
+  const fetchOrdersForAdmin = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/admin/orders');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to fetch orders for admin and parse error' }));
+        throw new Error(errorData.error || `Failed to fetch orders. Status: ${response.status}`);
+      }
+      const data: OrderType[] = await response.json();
+      setOrders(data);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      toast({ variant: 'destructive', title: 'Error Fetching Orders', description: errorMessage });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (session?.user?.role && [Role.ADMIN, Role.SELLER].includes(session.user.role)) {
+      fetchOrdersForAdmin();
+    }
+  }, [session, fetchOrdersForAdmin]);
+
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    setUpdatingOrderId(orderId);
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || `Failed to update order status. Status: ${response.status}`);
+      }
+      toast({ title: 'Order Status Updated!', description: `Order #${orderId.substring(0,8)}... moved to ${newStatus}.` });
+      fetchOrdersForAdmin(); // Refresh order list
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      toast({ variant: 'destructive', title: 'Error Updating Status', description: errorMessage });
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+  
+  const getStatusColor = (status: OrderType['status']) => {
+    switch (status) {
+      case 'Pending': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300';
+      case 'Processing': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300';
+      case 'Shipped': return 'bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300';
+      case 'Delivered': return 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300';
+      case 'Cancelled': return 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300';
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300';
+    }
+  };
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="ml-2 text-muted-foreground">Loading orders...</p>
+        </div>
+      );
+    }
+    if (error) {
+      return <p className="text-center text-destructive py-4">Error: {error}</p>;
+    }
+    if (orders.length === 0) {
+      return <p className="text-muted-foreground text-center py-4">No orders found.</p>;
+    }
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Order ID</TableHead>
+            <TableHead>Customer</TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead className="text-right">Total</TableHead>
+            <TableHead>Items</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {orders.map((order) => (
+            <TableRow key={order.id}>
+              <TableCell className="font-medium text-xs">#{order.id.substring(0, 8)}...</TableCell>
+              <TableCell className="text-sm">
+                {order.user?.name || order.user?.email || 'N/A'}
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground">
+                {format(new Date(order.createdAt), 'PP')}
+              </TableCell>
+              <TableCell className="text-right font-semibold text-sm">${order.totalAmount.toFixed(2)}</TableCell>
+              <TableCell className="text-xs text-muted-foreground">{order.orderItems.length} item(s)</TableCell>
+              <TableCell>
+                <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${getStatusColor(order.status)}`}>
+                  {order.status}
+                </span>
+              </TableCell>
+              <TableCell className="text-right">
+                {updatingOrderId === order.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-primary inline-block" />
+                ) : (
+                  <>
+                    {order.status === OrderStatus.Pending && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700"
+                        onClick={() => handleUpdateOrderStatus(order.id, OrderStatus.Processing)}
+                      >
+                        <CheckCircle className="mr-1.5 h-3.5 w-3.5" /> Accept
+                      </Button>
+                    )}
+                    {order.status === OrderStatus.Processing && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs border-blue-500 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                        onClick={() => handleUpdateOrderStatus(order.id, OrderStatus.Shipped)}
+                      >
+                         <Truck className="mr-1.5 h-3.5 w-3.5" /> Mark Shipped
+                      </Button>
+                    )}
+                    {/* Add other actions for different statuses if needed */}
+                  </>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-semibold text-foreground">Sales Overview</h1>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {salesStats.map((stat) => (
-          <Card key={stat.title} className="shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-              <stat.icon className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">{stat.change}</p>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-semibold text-foreground flex items-center">
+          <Package className="mr-3 h-7 w-7 text-primary" /> Order Management
+        </h1>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-md">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <BarChart3 className="mr-2 h-5 w-5 text-primary" />
-              Sales Trends
-            </CardTitle>
-            <CardDescription>Visual representation of sales performance over time.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64 bg-muted/50 rounded-md flex items-center justify-center">
-              <p className="text-muted-foreground">Sales Chart Placeholder</p>
-            </div>
-            {/* In a real app, you'd use a charting library here, e.g., Recharts with Shadcn Chart components */}
-            {/* Example: <LineChart width={500} height={300} data={data}>...</LineChart> */}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-md">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <ListOrdered className="mr-2 h-5 w-5 text-primary" />
-              Recent Orders
-            </CardTitle>
-            <CardDescription>A quick look at the latest transactions.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {/* Placeholder for recent orders list */}
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="flex justify-between items-center p-3 bg-muted/30 rounded-md">
-                  <div>
-                    <p className="font-medium text-sm">Order #123{i + 45}</p>
-                    <p className="text-xs text-muted-foreground">Customer Name {i+1} - 2 items</p>
-                  </div>
-                  <p className="font-semibold text-sm text-primary">${(75 + i * 15).toFixed(2)}</p>
-                </div>
-              ))}
-            </div>
-            <div className="text-right mt-4">
-                <a href="#" className="text-sm text-primary hover:underline">View All Orders &rarr;</a>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <Card className="shadow-md">
         <CardHeader>
-          <CardTitle>Top Selling Products</CardTitle>
-          <CardDescription>Products that are currently performing the best.</CardDescription>
+          <CardTitle className="flex items-center">
+             All Orders
+          </CardTitle>
+          <CardDescription>View and manage customer orders. Accept pending orders and mark them as shipped.</CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Placeholder for top selling products */}
-          <ul className="space-y-2">
-            <li className="text-muted-foreground text-sm">1. Wireless Earbuds - 150 units</li>
-            <li className="text-muted-foreground text-sm">2. Airpods Max - 90 units</li>
-            <li className="text-muted-foreground text-sm">3. Bose BT Earphones - 75 units</li>
-          </ul>
-           <div className="text-right mt-4">
-                <a href="/admin/products" className="text-sm text-primary hover:underline">Manage Products &rarr;</a>
-            </div>
+          {renderContent()}
         </CardContent>
       </Card>
     </div>
