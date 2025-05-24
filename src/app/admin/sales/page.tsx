@@ -13,10 +13,11 @@ import {
 } from '@/components/ui/table';
 import { Package, CheckCircle, Truck, Loader2 } from 'lucide-react';
 import type { OrderType } from '@/types';
+import { OrderStatus } from '@/types'; // Import OrderStatus from re-export in types
 import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from 'next-auth/react';
-import { Role, OrderStatus } from '@prisma/client'; // Ensure OrderStatus is imported
+import { Role } from '@prisma/client';
 import { format } from 'date-fns';
 
 export default function AdminOrderManagementPage() {
@@ -66,7 +67,7 @@ export default function AdminOrderManagementPage() {
         throw new Error(result.error || `Failed to update order status. Status: ${response.status}`);
       }
       toast({ title: 'Order Status Updated!', description: `Order #${orderId.substring(0,8)}... moved to ${newStatus}.` });
-      fetchOrdersForAdmin(); 
+      fetchOrdersForAdmin();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
       toast({ variant: 'destructive', title: 'Error Updating Status', description: errorMessage });
@@ -74,7 +75,7 @@ export default function AdminOrderManagementPage() {
       setUpdatingOrderId(null);
     }
   };
-  
+
   const getStatusColor = (status: OrderType['status']) => {
     switch (status) {
       case OrderStatus.Pending: return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300';

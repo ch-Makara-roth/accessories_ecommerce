@@ -1,20 +1,23 @@
 
-import type { Role } from '@prisma/client'; // Import Role enum from Prisma
+import type { Role, OrderStatus as PrismaOrderStatusEnum } from '@prisma/client'; // Import Prisma enum
 import type { ObjectId } from 'mongodb';
+
+// Re-export Prisma's OrderStatus enum for consistent use
+export { Role, PrismaOrderStatusEnum as OrderStatus };
 
 export type Category = {
   id: string;
-  _id?: ObjectId | string; 
+  _id?: ObjectId | string;
   name: string;
   slug: string;
-  icon?: React.ElementType; 
+  icon?: React.ElementType;
   createdAt?: Date;
   updatedAt?: Date;
 };
 
 export type Product = {
-  _id?: ObjectId | string; 
-  id: string; 
+  _id?: ObjectId | string;
+  id: string;
   name: string;
   price: number;
   originalPrice?: number;
@@ -22,18 +25,18 @@ export type Product = {
   reviewCount?: number;
   description: string;
   image: string;
-  
-  type?: string; 
+
+  type?: string;
   color?: string;
   material?: string;
-  offer?: string; 
+  offer?: string;
   tags?: string[];
   dataAiHint?: string;
   stock?: number;
-  status?: 'Active' | 'Draft' | 'Archived' | 'Scheduled'; 
+  status?: 'Active' | 'Draft' | 'Archived' | 'Scheduled';
 
-  categoryId?: string | null; 
-  category?: Category | null; 
+  categoryId?: string | null;
+  category?: Category | null;
   createdAt?: Date;
   updatedAt?: Date;
 };
@@ -47,22 +50,21 @@ export interface CartItem {
 export type OrderItemType = {
   id: string;
   productId: string;
-  product: Product; 
+  product: Product;
   quantity: number;
-  price: number; 
+  price: number;
   createdAt?: Date;
   updatedAt?: Date;
 };
 
-export type OrderStatus = "Pending" | "Processing" | "Shipped" | "Delivered" | "Cancelled";
-
+// OrderType now uses the re-exported PrismaOrderStatusEnum
 export type OrderType = {
   id: string;
   userId: string;
-  user?: { name?: string | null; email?: string | null }; 
+  user?: { name?: string | null; email?: string | null };
   totalAmount: number;
-  status: OrderStatus;
-  shippingAddress?: any; 
+  status: PrismaOrderStatusEnum; // Use the imported enum type
+  shippingAddress?: any;
   createdAt: Date;
   updatedAt: Date;
   orderItems: OrderItemType[];
@@ -72,21 +74,19 @@ export type AdminNotification = {
   id: string;
   title: string;
   description: string;
-  category: string; 
+  category: string;
   isRead: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 };
 
-// Define a more complete User type for frontend use, especially for admin user management
 export type User = {
   id: string;
   name?: string | null;
   email?: string | null;
-  emailVerified?: Date | string | null; // Prisma returns Date, NextAuth might use string initially
+  emailVerified?: Date | string | null;
   image?: string | null;
-  role?: Role; // Use the Prisma Role enum
+  role?: Role;
   createdAt?: Date | string;
   updatedAt?: Date | string;
-  // Exclude password or other sensitive fields that shouldn't be on the client
 };
