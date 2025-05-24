@@ -27,7 +27,6 @@ export async function PUT(
   const session = await getServerSession(authOptions);
   const { orderId } = params;
 
-  // Updated: Allow DELIVERY role to also update status
   if (!session || !session.user || ![Role.ADMIN, Role.SELLER, Role.DELIVERY].includes(session.user.role as Role)) {
     return NextResponse.json({ error: 'Unauthorized. Admin, Seller, or Delivery access required.' }, { status: 403 });
   }
@@ -52,16 +51,16 @@ export async function PUT(
     }
 
     const { status: newStatus } = validation.data;
+    const userRole = session.user.role as Role;
 
     // Role-specific status update restrictions
-    const userRole = session.user.role as Role;
     if (userRole === Role.SELLER && !['Processing', 'Shipped'].includes(newStatus)) {
         return NextResponse.json({ error: 'Sellers can only update status to Processing or Shipped.' }, { status: 403 });
     }
-    if (userRole === Role.DELIVERY && newStatus !== 'Delivered') {
+    if (userRole === Role.DELIVERY && newStatus !== 'Delivered') { // DELIVERY can only mark as Delivered
         return NextResponse.json({ error: 'Delivery personnel can only update status to Delivered.' }, { status: 403 });
     }
-    // Admins can update to any status handled by the schema.
+    // Admins can update to any status handled by the schema (no specific restriction here for admin).
 
     let updatedOrder;
 
@@ -113,6 +112,7 @@ export async function PUT(
       updatedOrder = transactionResults[transactionResults.length -1]; 
 
     } else {
+      // For other status updates (including DELIVERY marking as "Delivered")
       updatedOrder = await prisma.order.update({
         where: { id: orderId },
         data: { status: newStatus as PrismaOrderStatusEnum },

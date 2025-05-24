@@ -9,8 +9,9 @@ import { Role } from '@prisma/client';
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
 
-  if (!session || !session.user || ![Role.ADMIN, Role.SELLER].includes(session.user.role as Role)) {
-    return NextResponse.json({ error: 'Unauthorized. Admin or Seller access required.' }, { status: 403 });
+  // Updated: Allow DELIVERY role to fetch orders as well
+  if (!session || !session.user || ![Role.ADMIN, Role.SELLER, Role.DELIVERY].includes(session.user.role as Role)) {
+    return NextResponse.json({ error: 'Unauthorized. Admin, Seller, or Delivery access required.' }, { status: 403 });
   }
 
   if (!prisma || !prisma.order || typeof prisma.order.findMany !== 'function') {
@@ -48,6 +49,6 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('API GET /api/admin/orders: Error fetching orders:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-    return NextResponse.json({ error: 'Failed to fetch orders for admin/seller', details: errorMessage }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch orders for admin/seller/delivery', details: errorMessage }, { status: 500 });
   }
 }

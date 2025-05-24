@@ -19,7 +19,7 @@ export default function CallbackHandlerPage() {
 
     if (status === 'authenticated' && session?.user?.role) {
       const userRole = session.user.role;
-      if ([Role.ADMIN, Role.SELLER, Role.STOCK].includes(userRole)) {
+      if ([Role.ADMIN, Role.SELLER, Role.STOCK, Role.DELIVERY].includes(userRole)) { // Added Role.DELIVERY
         router.replace('/admin');
       } else if (userRole === Role.CUSTOMER) {
         router.replace('/account');

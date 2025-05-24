@@ -54,7 +54,7 @@ function AuthPageContent() {
     if (status === 'authenticated') {
       if (session?.user?.role) {
         const userRole = session.user.role;
-        if ([Role.ADMIN, Role.SELLER, Role.STOCK].includes(userRole)) {
+        if ([Role.ADMIN, Role.SELLER, Role.STOCK, Role.DELIVERY].includes(userRole)) { // Added Role.DELIVERY
           router.replace('/admin');
         } else {
           router.replace('/account');
@@ -79,11 +79,13 @@ function AuthPageContent() {
       if (errorParam.toLowerCase().includes('email not verified')) {
         title = 'Email Verification Required';
         description = errorParam;
-        const attemptEmail = emailFromUrl || loginEmail || signupEmail; 
+        const attemptEmail = emailFromUrl || loginEmail || signupEmail;
         if (attemptEmail) {
           setOtpTargetEmail(attemptEmail);
           setAuthStep('otpVerification');
-          shouldShowToast = false; 
+          shouldShowToast = false;
+        } else {
+          description = "Email not verified. Please try logging in again to trigger OTP.";
         }
       } else if (errorParam === 'AccessDeniedAdmin') {
         title = 'Access Denied';
@@ -94,11 +96,11 @@ function AuthPageContent() {
          title = 'Authentication Error';
          description = 'There was an issue during the authentication callback. Please try again.';
       }
-      
+
       if (shouldShowToast) {
         toast({ variant: 'destructive', title, description });
       }
-      
+
       // Clean up error from URL to prevent re-triggering on refresh
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('error');
@@ -116,7 +118,6 @@ function AuthPageContent() {
   if (status === 'loading' && !searchParams.get('error')) {
     return <AuthPageFallback />;
   }
-  // The redirect for authenticated users is now handled by useEffect above
 
 
   const handleCustomerEmailLogin = async (e: FormEvent) => {
@@ -129,21 +130,22 @@ function AuthPageContent() {
     });
 
     if (result?.error) {
-      // The useEffect for searchParams will handle showing the toast
       router.push(`/auth?error=${encodeURIComponent(result.error)}&email=${encodeURIComponent(loginEmail)}`);
     } else if (result?.ok) {
-      const updatedSession = await getSession();
+      const updatedSession = await getSession(); // Fetch session to get role
       toast({ title: 'Login Successful!', description: 'Redirecting...' });
       if (updatedSession?.user?.role) {
         const userRole = updatedSession.user.role;
-        if ([Role.ADMIN, Role.SELLER, Role.STOCK].includes(userRole)) {
+        if ([Role.ADMIN, Role.SELLER, Role.STOCK, Role.DELIVERY].includes(userRole)) { // Added Role.DELIVERY
           router.push('/admin');
         } else {
           router.push('/account');
         }
       } else {
-        router.push('/account'); 
+        router.push('/account'); // Fallback
       }
+    } else {
+       toast({ variant: 'destructive', title: 'Login Failed', description: 'An unknown error occurred. Please try again.' });
     }
     setIsLoading(false);
   };
@@ -195,7 +197,7 @@ function AuthPageContent() {
       }
       toast({ title: 'Email Verified!', description: 'Your email has been verified. Please log in.' });
       setAuthStep('login');
-      setLoginEmail(otpTargetEmail); 
+      setLoginEmail(otpTargetEmail);
       setOtpCode('');
     } catch (error) {
       toast({ variant: 'destructive', title: 'OTP Verification Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.' });
@@ -225,7 +227,7 @@ function AuthPageContent() {
     }
     setIsResendingOtp(false);
   };
-  
+
   const handleAdminLoginRedirect = () => {
     router.push('/admin');
   };
@@ -330,8 +332,8 @@ function AuthPageContent() {
         <CardHeader>
           <CardTitle className="text-2xl">Verify Your Email</CardTitle>
           <CardDescription>
-            An OTP should be sent to <span className="font-semibold">{otpTargetEmail}</span>. 
-            (For testing, check server console for OTP).
+            An OTP should be sent to <span className="font-semibold">{otpTargetEmail}</span>.
+            (Check server console for OTP if email sending is not fully configured).
             Enter it below to verify your email address.
           </CardDescription>
         </CardHeader>
