@@ -6,8 +6,8 @@ import type { Product } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import StarRating from './StarRating';
-import { Heart } from 'lucide-react';
-import React, { useState } from 'react'; // Added useState
+import { Heart, PackageCheck, PackageX } from 'lucide-react';
+import React, { useState } from 'react'; 
 import AddToCartButton from './AddToCartButton';
 
 interface ProductCardProps {
@@ -19,8 +19,9 @@ const ProductCard: React.FC<ProductCardProps> = React.memo(({ product }) => {
 
   const toggleFavorite = () => {
     setIsFavorited(!isFavorited);
-    // In a real app, you'd also update backend/context state here
   };
+
+  const isOutOfStock = product.stock == null || product.stock <= 0;
 
   return (
     <Card className="flex flex-col h-full overflow-hidden rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out">
@@ -47,6 +48,11 @@ const ProductCard: React.FC<ProductCardProps> = React.memo(({ product }) => {
           />
           <span className="sr-only">Favorite</span>
         </Button>
+        {isOutOfStock && (
+          <div className="absolute top-2 left-2 bg-destructive text-destructive-foreground text-xs font-semibold px-2 py-1 rounded-full shadow-md">
+            Out of Stock
+          </div>
+        )}
       </CardHeader>
       <CardContent className="p-4 flex-grow">
         <CardTitle className="text-lg mb-1 leading-tight">
@@ -56,19 +62,30 @@ const ProductCard: React.FC<ProductCardProps> = React.memo(({ product }) => {
         </CardTitle>
         <div className="flex items-center mb-2">
           <StarRating rating={product.rating} size={16} />
-          {product.reviewCount && <span className="ml-2 text-xs text-muted-foreground">({product.reviewCount})</span>}
+          {product.reviewCount != null && <span className="ml-2 text-xs text-muted-foreground">({product.reviewCount})</span>}
         </div>
         <p className="text-sm text-muted-foreground mb-3 h-10 overflow-hidden">{product.description}</p>
-        <p className="text-lg sm:text-xl font-semibold text-primary mb-1">
-          ${product.price.toFixed(2)}
-          {product.originalPrice && (
+        
+        <div className="flex items-baseline mb-1">
+          <p className="text-lg sm:text-xl font-semibold text-primary">
+            ${product.price.toFixed(2)}
+          </p>
+          {product.originalPrice && product.originalPrice > product.price && (
             <span className="ml-2 text-sm line-through text-muted-foreground">${product.originalPrice.toFixed(2)}</span>
           )}
-        </p>
+        </div>
+
+        {!isOutOfStock && product.stock != null && product.stock > 0 && product.stock <= 10 && (
+          <p className="text-xs text-yellow-600 dark:text-yellow-400 mb-2">Only {product.stock} left in stock!</p>
+        )}
       </CardContent>
       <CardFooter className="p-4 pt-0">
-        <AddToCartButton product={product} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-            Add to Cart
+        <AddToCartButton 
+          product={product} 
+          className="w-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          disabled={isOutOfStock}
+        >
+          {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
         </AddToCartButton>
       </CardFooter>
     </Card>

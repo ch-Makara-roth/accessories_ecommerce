@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button';
 import StarRating from '@/components/products/StarRating';
 import ProductGrid from '@/components/products/ProductGrid';
 import { Separator } from '@/components/ui/separator';
-import { Heart, Share2, Loader2 } from 'lucide-react';
+import { Heart, Share2, Loader2, PackageCheck, PackageX } from 'lucide-react';
 import Link from 'next/link';
 import AddToCartButton from '@/components/products/AddToCartButton';
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation'; // Import useParams
+import { useParams } from 'next/navigation'; 
 import { useToast } from '@/hooks/use-toast';
 
 export default function ProductDetailPage() {
@@ -38,9 +38,8 @@ export default function ProductDetailPage() {
       const productData: Product = await productRes.json();
       setProduct(productData);
 
-      // Fetch related products if category exists
       if (productData.category?.slug) {
-        const relatedRes = await fetch(`/api/products?categorySlug=${productData.category.slug}&limit=4&excludeProductId=${productId}`); // Fetch 4 to get 3 related
+        const relatedRes = await fetch(`/api/products?categorySlug=${productData.category.slug}&limit=4&excludeProductId=${productId}`);
         if (relatedRes.ok) {
           const relatedData = await relatedRes.json();
           setRelatedProducts(relatedData.products?.filter((p: Product) => p.id !== productId).slice(0, 3) || []);
@@ -68,7 +67,6 @@ export default function ProductDetailPage() {
 
   const toggleFavorite = () => {
     setIsFavorited(!isFavorited);
-    // In a real app, you'd also update backend/context state here
   };
 
   if (isLoading) {
@@ -104,6 +102,8 @@ export default function ProductDetailPage() {
     );
   }
 
+  const isOutOfStock = product.stock == null || product.stock <= 0;
+
   return (
     <div className="py-8">
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12 mb-12">
@@ -132,11 +132,23 @@ export default function ProductDetailPage() {
           </div>
           <p className="text-2xl lg:text-3xl font-semibold text-foreground mb-4">
             ${product.price.toFixed(2)}
-            {product.originalPrice && (
+            {product.originalPrice && product.originalPrice > product.price && (
               <span className="ml-3 text-lg line-through text-muted-foreground">${product.originalPrice.toFixed(2)}</span>
             )}
           </p>
           {product.offer && <p className="text-accent font-semibold mb-4 text-lg">{product.offer}</p>}
+          
+          <div className="mb-4">
+            {isOutOfStock ? (
+              <div className="flex items-center text-destructive font-semibold p-2 border border-destructive/50 rounded-md bg-destructive/10">
+                <PackageX className="mr-2 h-5 w-5" /> Out of Stock
+              </div>
+            ) : (
+              <div className="flex items-center text-green-600 font-semibold p-2 border border-green-500/50 rounded-md bg-green-500/10">
+                <PackageCheck className="mr-2 h-5 w-5" /> In Stock: {product.stock} available
+              </div>
+            )}
+          </div>
           
           <p className="text-foreground/80 leading-relaxed mb-6">{product.description}</p>
           
@@ -144,9 +156,10 @@ export default function ProductDetailPage() {
             <AddToCartButton 
               product={product} 
               size="lg" 
-              className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90" 
+              className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+              disabled={isOutOfStock}
             >
-              Add to Cart
+              {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
             </AddToCartButton>
             <Button 
               variant="outline" 
