@@ -18,7 +18,7 @@ import {
   X,
   LogOut,
   Truck as DeliveryIcon,
-  Loader2, // Keep Loader2
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { usePathname, useRouter } from 'next/navigation';
@@ -97,10 +97,10 @@ export default function AdminLayout({
       }
     };
 
-    fetchUnreadCount(); // Fetch immediately on mount
-    const intervalId = setInterval(fetchUnreadCount, 30000); // Poll every 30 seconds
+    fetchUnreadCount();
+    const intervalId = setInterval(fetchUnreadCount, 30000); 
 
-    return () => clearInterval(intervalId); // Cleanup interval on unmount
+    return () => clearInterval(intervalId);
   }, [session, userRole]);
 
   const navItems: AdminNavItem[] = [
@@ -112,7 +112,7 @@ export default function AdminLayout({
       isAccordion: true,
       subItems: [
         { href: '/admin/products', label: 'Product List', icon: List, allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK] },
-        { href: '/admin/products/categories', label: 'Categories', icon: Shapes, allowedRoles: [Role.ADMIN, Role.SELLER] },
+        { href: '/admin/products/categories', label: 'Categories', icon: Shapes, allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK] },
       ],
       allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK],
     },
@@ -138,7 +138,7 @@ export default function AdminLayout({
   };
 
   useEffect(() => {
-    setIsSheetOpen(false); // Close sheet on route change
+    setIsSheetOpen(false); 
   }, [pathname]);
 
   const handleAdminSearchSubmit = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -148,8 +148,6 @@ export default function AdminLayout({
         title: 'Admin Search (Placeholder)',
         description: `Searched for: "${adminSearchTerm}". Implement actual search logic.`,
       });
-      // setIsSearchVisible(false); // Optionally close search after submit
-      // setAdminSearchTerm('');
     }
   };
 
@@ -282,17 +280,19 @@ export default function AdminLayout({
                 <span className="sr-only">Open menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-3/4 max-w-xs p-0 flex flex-col">
+            <SheetContent side="left" className="w-3/4 max-w-xs p-0 flex flex-col bg-background">
                 <SheetHeader className="flex flex-row items-center justify-between h-16 border-b px-4 py-2">
                    <SheetTitle>
                       <Link href="/admin" onClick={() => setIsSheetOpen(false)}>
                         Admin Menu
                       </Link>
                     </SheetTitle>
-                    <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => setIsSheetOpen(false)}>
-                        <X className="h-5 w-5" />
-                        <span className="sr-only">Close menu</span>
-                    </Button>
+                    <SheetClose asChild>
+                        <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => setIsSheetOpen(false)}>
+                            <X className="h-5 w-5" />
+                            <span className="sr-only">Close menu</span>
+                        </Button>
+                    </SheetClose>
                 </SheetHeader>
                 <nav className="flex-grow p-4 space-y-2 overflow-y-auto">
                     {renderNavItems()}

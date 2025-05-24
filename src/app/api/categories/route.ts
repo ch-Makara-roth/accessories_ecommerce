@@ -3,16 +3,19 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { Role } from '@prisma/client';
 
 // Function to generate a URL-friendly slug
 function generateSlug(name: string): string {
   return name
     .toLowerCase()
-    .replace(/\s+/g, '-') // Replace spaces with -
-    .replace(/[^\w-]+/g, '') // Remove all non-word chars
-    .replace(/--+/g, '-') // Replace multiple - with single -
-    .replace(/^-+/, '') // Trim - from start of text
-    .replace(/-+$/, ''); // Trim - from end of text
+    .replace(/\s+/g, '-') 
+    .replace(/[^\w-]+/g, '') 
+    .replace(/--+/g, '-') 
+    .replace(/^-+/, '') 
+    .replace(/-+$/, ''); 
 }
 
 const categoryCreateSchema = z.object({
@@ -33,6 +36,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user || ![Role.ADMIN, Role.SELLER, Role.STOCK].includes(session.user.role as Role)) {
+    return NextResponse.json({ error: 'Unauthorized. Admin, Seller or Stock role required to create categories.' }, { status: 403 });
+  }
+
   try {
     const body = await request.json();
     const validation = categoryCreateSchema.safeParse(body);
@@ -44,14 +52,12 @@ export async function POST(request: NextRequest) {
     const { name } = validation.data;
     const slug = generateSlug(name);
 
-    // Check if category with the same name or slug already exists
     const existingCategoryByName = await prisma.category.findUnique({ where: { name } });
     if (existingCategoryByName) {
       return NextResponse.json({ error: `Category with name "${name}" already exists.` }, { status: 409 });
     }
     const existingCategoryBySlug = await prisma.category.findUnique({ where: { slug } });
     if (existingCategoryBySlug) {
-        // This case is less likely if slug is derived from a unique name, but good to have
       return NextResponse.json({ error: `Category with slug "${slug}" already exists (derived from name). Please choose a different name.` }, { status: 409 });
     }
 

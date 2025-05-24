@@ -6,6 +6,9 @@ import prisma from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 import fs from 'fs/promises';
 import path from 'path';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { Role } from '@prisma/client';
 
 // GET a single product by ID
 export async function GET(
@@ -42,7 +45,7 @@ export async function GET(
         reviewCount: product.reviewCount ?? 0,
         tags: product.tags ?? [],
         status: product.status ?? 'Draft',
-        image: product.image || '/placehold.co/600x400.png', // Default if no image
+        image: product.image || '/placehold.co/600x400.png',
         dataAiHint: product.dataAiHint || `${product.category?.name || 'product'} ${product.name || 'item'}`.substring(0,50).toLowerCase(),
     };
 
@@ -63,6 +66,11 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user || ![Role.ADMIN, Role.SELLER, Role.STOCK].includes(session.user.role as Role)) {
+    return NextResponse.json({ error: 'Unauthorized. Admin, Seller or Stock role required to update products.' }, { status: 403 });
+  }
+
   const { id } = params;
   if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
     return NextResponse.json({ error: 'Valid Product ID is required for update.' }, { status: 400 });
@@ -90,15 +98,14 @@ export async function PUT(
     let imageUrl: string | undefined = undefined;
     const imageFile = formData.get('imageFile') as File | null;
 
-    if (imageFile) {
-        // --- DEVELOPMENT ONLY: Local File Storage ---
+    if (imageFile && imageFile.size > 0) {
         console.warn(`API PUT /api/products/${id}: USING LOCAL FILE STORAGE FOR IMAGE UPDATE. THIS IS FOR DEVELOPMENT ONLY.`);
         const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'products');
         await fs.mkdir(uploadsDir, { recursive: true });
 
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const fileExtension = path.extname(imageFile.name) || '.jpg';
-        const uniqueFilename = `${path.basename(imageFile.name, fileExtension)}-${uniqueSuffix}${fileExtension}`;
+        const uniqueFilename = `${path.basename(imageFile.name, fileExtension).replace(/[^a-zA-Z0-9-_]/g, '')}-${uniqueSuffix}${fileExtension}`;
         const filePath = path.join(uploadsDir, uniqueFilename);
         
         const fileBuffer = Buffer.from(await imageFile.arrayBuffer());
@@ -106,8 +113,6 @@ export async function PUT(
 
         imageUrl = `/uploads/products/${uniqueFilename}`;
         console.log(`API PUT /api/products/${id}: New image saved to ${filePath}. Public URL: ${imageUrl}`);
-        // TODO: Optionally delete old image file if replacing
-        // --- END DEVELOPMENT ONLY ---
     }
 
 
@@ -116,10 +121,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Price must be a valid number for update.' }, { status: 400 });
     }
 
-    let parsedOriginalPrice: number | null = null;
+    let parsedOriginalPrice: number | null | undefined = undefined; // undefined means don't update
     if (productFields.originalPrice !== undefined) {
       if (String(productFields.originalPrice).trim() === '') {
-        parsedOriginalPrice = null;
+        parsedOriginalPrice = null; // Explicitly set to null
       } else {
         parsedOriginalPrice = parseFloat(String(productFields.originalPrice));
         if (isNaN(parsedOriginalPrice)) {
@@ -128,10 +133,10 @@ export async function PUT(
       }
     }
     
-    let parsedStock: number | null = null;
+    let parsedStock: number | null | undefined = undefined; // undefined means don't update
      if (productFields.stock !== undefined) {
       if (String(productFields.stock).trim() === '') {
-        parsedStock = null;
+        parsedStock = null; // Explicitly set to null
       } else {
         parsedStock = parseInt(String(productFields.stock), 10);
         if (isNaN(parsedStock)) {
@@ -162,21 +167,20 @@ export async function PUT(
       dataToUpdate.stock = parsedStock;
     }
 
-
     let categoryNameForHint = productFields.name || 'item'; 
     const categoryId = productFields.category ? String(productFields.category) : null;
 
-    if (categoryId && categoryId.trim() !== '' && /^[0-9a-fA-F]{24}$/.test(categoryId)) {
+    if (categoryId && categoryId.trim() !== '' && categoryId !== 'all' && /^[0-9a-fA-F]{24}$/.test(categoryId)) {
       const categoryExists = await prisma.category.findUnique({ where: { id: categoryId } });
       if (categoryExists) {
         dataToUpdate.category = { connect: { id: categoryId } };
         categoryNameForHint = categoryExists.name;
       } else {
-        console.warn(`API PUT /api/products/${id}: Category with ID "${categoryId}" not found. Category link will not be updated.`);
-        dataToUpdate.category = { disconnect: true }; // Or set categoryId to null
+        console.warn(`API PUT /api/products/${id}: Category with ID "${categoryId}" not found. Category link will be disconnected.`);
+        dataToUpdate.category = { disconnect: true }; 
         dataToUpdate.categoryId = null;
       }
-    } else if (categoryId === '' || categoryId === null) { // Explicitly unsetting category
+    } else if (categoryId === '' || categoryId === null || categoryId === 'all') { 
         dataToUpdate.category = { disconnect: true };
         dataToUpdate.categoryId = null;
     } else if (categoryId) {
@@ -218,6 +222,11 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user || ![Role.ADMIN, Role.STOCK].includes(session.user.role as Role)) {
+    return NextResponse.json({ error: 'Unauthorized. Admin or Stock role required to delete products.' }, { status: 403 });
+  }
+
   const { id } = params;
    if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
     return NextResponse.json({ error: 'Valid Product ID is required for deletion.' }, { status: 400 });
@@ -229,28 +238,16 @@ export async function DELETE(
   }
 
   try {
-    // Optionally, retrieve product to get image path for deletion
-    // const product = await prisma.product.findUnique({ where: { id } });
-
     await prisma.product.delete({
       where: { id },
     });
-
-    // TODO: If product.image pointed to a locally stored file in public/uploads, delete it here.
-    // For example: if (product?.image?.startsWith('/uploads/')) {
-    //   await fs.unlink(path.join(process.cwd(), 'public', product.image));
-    // }
-
     console.log(`API DELETE /api/products/${id}: Product deleted successfully.`);
     return NextResponse.json({ message: 'Product deleted successfully' }, { status: 200 });
   } catch (e: any) {
     console.error(`API DELETE /api/products/${id} Error:`, e);
-    if (e.code === 'P2025') { // Record to delete not found
+    if (e.code === 'P2025') { 
       return NextResponse.json({ error: 'Product not found for deletion.' }, { status: 404 });
     }
     return NextResponse.json({ error: 'Failed to delete product', details: e.message || String(e) }, { status: 500 });
   }
 }
-
-
-    

@@ -48,7 +48,7 @@ import type { Product, Category as CategoryType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { useSession } from 'next-auth/react';
-import { Role } from '@prisma/client'; // Import Role enum
+import { Role } from '@prisma/client';
 
 export default function AdminProductsPage() {
   const { data: session } = useSession();
@@ -176,14 +176,13 @@ export default function AdminProductsPage() {
   }, [fetchCategoriesForFilter]);
 
   useEffect(() => {
-    // Sync dialog selections with applied filters when dialog opens
     if (isFilterDialogOpen) {
       setSelectedCategoryIdsInDialog([...appliedCategoryIds]);
       setSelectedStatusesInDialog([...appliedStatuses]);
     }
   }, [isFilterDialogOpen, appliedCategoryIds, appliedStatuses]);
-
-  const handleApplyFiltersInDialog = () => {
+  
+  const handleApplyFilters = () => {
     setAppliedCategoryIds([...selectedCategoryIdsInDialog]);
     setAppliedStatuses([...selectedStatusesInDialog]);
 
@@ -200,10 +199,10 @@ export default function AdminProductsPage() {
     }
     
     toast({ title: 'Product Filters Updated', description: filterDesc });
-    setIsFilterDialogOpen(false); // Close dialog after applying
+    setIsFilterDialogOpen(false); 
   };
   
-  const handleClearDialogSelections = () => {
+  const handleClearDialogFilters = () => {
     setSelectedCategoryIdsInDialog([]);
     setSelectedStatusesInDialog([]);
     setCategorySearchTerm('');
@@ -213,7 +212,7 @@ export default function AdminProductsPage() {
   const handleResetAllFilters = () => {
     setAppliedCategoryIds([]);
     setAppliedStatuses([]);
-    setSelectedCategoryIdsInDialog([]); // Also clear dialog selections
+    setSelectedCategoryIdsInDialog([]);
     setSelectedStatusesInDialog([]);
     setCategorySearchTerm('');
     setStatusSearchTerm('');
@@ -265,9 +264,9 @@ export default function AdminProductsPage() {
     status.toLowerCase().includes(statusSearchTerm.toLowerCase())
   );
   
-  const canAddProduct = userRole === Role.ADMIN || userRole === Role.SELLER;
-  const canDeleteProduct = userRole === Role.ADMIN;
-  const canEditProduct = userRole === Role.ADMIN || userRole === Role.SELLER;
+  const canAddProduct = userRole === Role.ADMIN || userRole === Role.SELLER || userRole === Role.STOCK;
+  const canDeleteProduct = userRole === Role.ADMIN || userRole === Role.STOCK;
+  const canEditProduct = userRole === Role.ADMIN || userRole === Role.SELLER || userRole === Role.STOCK;
 
   const renderContent = () => {
     if (loading) {
@@ -388,8 +387,7 @@ export default function AdminProductsPage() {
             <Dialog open={isFilterDialogOpen} onOpenChange={(open) => {
                 setIsFilterDialogOpen(open);
                 if (!open) { 
-                   // User closed dialog without explicit "Apply", so we apply current dialog selections
-                   handleApplyFiltersInDialog();
+                   handleApplyFilters();
                 }
             }}>
               <DialogTrigger asChild>
@@ -402,7 +400,7 @@ export default function AdminProductsPage() {
                     )}
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-lg p-0"> {/* Custom width */}
+              <DialogContent className="sm:max-w-lg p-0 bg-transparent"> 
                 <DialogHeader className="p-4 border-b">
                   <div className="flex items-center justify-between">
                     <DialogTitle className="text-lg font-semibold">Filters</DialogTitle>
@@ -410,7 +408,7 @@ export default function AdminProductsPage() {
                   </div>
                 </DialogHeader>
                 <div className="p-4 space-y-4">
-                    <Accordion type="multiple" className="w-full space-y-2"  defaultValue={['category-filter', 'status-filter']}>
+                    <Accordion type="multiple" className="w-full space-y-2" defaultValue={['category-filter', 'status-filter']}>
                         <AccordionItem value="category-filter" className="border-b-0">
                             <AccordionTrigger className="text-sm font-medium hover:no-underline py-2 px-1 rounded hover:bg-muted/50">Category</AccordionTrigger>
                             <AccordionContent className="pt-2 space-y-2">
@@ -475,7 +473,6 @@ export default function AdminProductsPage() {
                         </AccordionItem>
                     </Accordion>
                 </div>
-                {/* Footer removed as per request */}
               </DialogContent>
             </Dialog>
 

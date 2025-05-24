@@ -3,6 +3,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { z } from 'zod';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { Role } from '@prisma/client';
 
 // Function to generate a URL-friendly slug
 function generateSlug(name: string): string {
@@ -17,7 +20,6 @@ function generateSlug(name: string): string {
 
 const categoryUpdateSchema = z.object({
   name: z.string().min(1, { message: 'Category name is required.' }).max(100),
-  // slug is not expected from client, it's derived from name
 });
 
 
@@ -51,6 +53,11 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user || ![Role.ADMIN, Role.SELLER, Role.STOCK].includes(session.user.role as Role)) {
+    return NextResponse.json({ error: 'Unauthorized. Admin, Seller or Stock role required to update categories.' }, { status: 403 });
+  }
+
   let validatedNameFromRequest: string | undefined;
   let generatedSlugFromRequest: string | undefined;
 
@@ -70,14 +77,13 @@ export async function PUT(
       }, { status: 400 });
     }
     
-    validatedNameFromRequest = validation.data.name; // Will be a non-empty string due to schema
+    validatedNameFromRequest = validation.data.name; 
     generatedSlugFromRequest = generateSlug(validatedNameFromRequest);
 
     if (!generatedSlugFromRequest && validatedNameFromRequest) { 
         return NextResponse.json({ error: 'Category name must result in a valid slug (e.g., contain alphanumeric characters).' }, { status: 400 });
     }
 
-    // Proactive check for conflicts with *other* categories
     const conflictingCategoryByName = await prisma.category.findFirst({
         where: {
             name: validatedNameFromRequest,
@@ -129,7 +135,7 @@ export async function PUT(
         } else {
             errorMessage = 'A category with this name or a similar name already exists (unique constraint violated).';
         }
-    } else if (error instanceof z.ZodError) { // Should be caught by validation.success check, but as a fallback
+    } else if (error instanceof z.ZodError) { 
         errorMessage = 'Invalid input: ' + error.errors.map(e => e.message).join(', ');
         status = 400;
     } else if (error instanceof Error) { 
@@ -145,6 +151,11 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user || ![Role.ADMIN, Role.STOCK].includes(session.user.role as Role)) {
+    return NextResponse.json({ error: 'Unauthorized. Admin or Stock role required to delete categories.' }, { status: 403 });
+  }
+
   try {
     const { id } = params;
     if (!id) {
