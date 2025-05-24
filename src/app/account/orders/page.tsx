@@ -7,7 +7,7 @@ import { Package, FileText, RotateCw, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { OrderType, OrderItemType } from '@/types';
-import { OrderStatus } from '@/types'; // Import OrderStatus from re-export in types
+import { OrderStatus } from '@prisma/client'; // Import OrderStatus directly
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { format } from 'date-fns';

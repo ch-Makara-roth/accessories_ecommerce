@@ -13,11 +13,11 @@ import {
 } from '@/components/ui/table';
 import { Package, CheckCircle, Truck, Loader2 } from 'lucide-react';
 import type { OrderType } from '@/types';
-import { OrderStatus } from '@/types'; // Import OrderStatus from re-export in types
+import { OrderStatus } from '@prisma/client'; // Import OrderStatus directly
+import { Role } from '@prisma/client';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from 'next-auth/react';
-import { Role } from '@prisma/client';
 import { format } from 'date-fns';
 
 export default function AdminOrderManagementPage() {
