@@ -4,10 +4,12 @@ import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { Role, OrderStatus } from '@prisma/client'; // Import OrderStatus
+import { Role, OrderStatus as PrismaOrderStatusEnum } from '@prisma/client'; // Import PrismaOrderStatusEnum
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 
-const OrderStatusValues = [
+// Explicitly define the possible string values for OrderStatus
+const orderStatusValues = [
   "Pending",
   "Processing",
   "Shipped",
@@ -16,7 +18,7 @@ const OrderStatusValues = [
 ] as const;
 
 const updateOrderStatusSchema = z.object({
-  status: z.enum(OrderStatusValues),
+  status: z.enum(orderStatusValues),
 });
 
 export async function PUT(
@@ -49,12 +51,12 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid status provided.', details: validation.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    const { status: newStatus } = validation.data;
+    const { status: newStatus } = validation.data; // newStatus is now a validated string like "Shipped"
 
     let updatedOrder;
 
-    if (newStatus === OrderStatus.Shipped) {
-      // Fetch order with items and products to check stock
+    // Use string literal for comparison
+    if (newStatus === "Shipped") {
       const orderToShip = await prisma.order.findUnique({
         where: { id: orderId },
         include: {
@@ -73,7 +75,7 @@ export async function PUT(
       }
       
       // Optional: Check if current status allows moving to Shipped (e.g., from Processing)
-      // if (orderToShip.status !== OrderStatus.Processing) {
+      // For example, if orderToShip.status !== "Processing"
       //   return NextResponse.json({ error: `Order cannot be marked as Shipped from current status: ${orderToShip.status}` }, { status: 400 });
       // }
 
@@ -90,24 +92,22 @@ export async function PUT(
         );
       }
 
-      const orderStatusUpdate = prisma.order.update({
+      const orderStatusUpdateOperation = prisma.order.update({
         where: { id: orderId },
-        data: { status: newStatus },
+        data: { status: newStatus as PrismaOrderStatusEnum }, // Cast to Prisma enum type for the database
         include: {
           user: { select: { name: true, email: true } },
           orderItems: { include: { product: { select: { id:true, name: true, image: true, stock: true } } } },
         },
       });
       
-      // Perform all updates in a transaction
-      const transactionResults = await prisma.$transaction([...productUpdates, orderStatusUpdate]);
-      updatedOrder = transactionResults[transactionResults.length -1]; // The last result is the updated order
+      const transactionResults = await prisma.$transaction([...productUpdates, orderStatusUpdateOperation]);
+      updatedOrder = transactionResults[transactionResults.length -1]; 
 
     } else {
-      // For other status updates, just update the order status
       updatedOrder = await prisma.order.update({
         where: { id: orderId },
-        data: { status: newStatus },
+        data: { status: newStatus as PrismaOrderStatusEnum }, // Cast to Prisma enum type for the database
         include: {
           user: { select: { name: true, email: true } },
           orderItems: { include: { product: { select: { id: true, name: true, image: true, stock: true } } } },
@@ -119,32 +119,31 @@ export async function PUT(
 
   } catch (error: any) {
     console.error(`API PUT /api/admin/orders/${orderId}: Error during status update. Raw error object:`);
-    try {
-      const errorDetailsToLog = {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-        code: error.code, 
-        meta: error.meta, 
-      };
-      console.error(JSON.stringify(errorDetailsToLog, null, 2));
-    } catch (stringifyError) {
-      console.error("Could not stringify the raw error object. Fallback to default logging:", error);
-    }
+    let errorDetailsToLog: any = { message: error.message };
+    if (error.stack) errorDetailsToLog.stack = error.stack;
+    if (error.name) errorDetailsToLog.name = error.name;
+    if (error.code) errorDetailsToLog.code = error.code; // For Prisma errors
+    if (error.meta) errorDetailsToLog.meta = error.meta; // For Prisma errors
 
+    try {
+        console.error(JSON.stringify(errorDetailsToLog, null, 2));
+    } catch (stringifyError) {
+        console.error("Could not stringify the raw error object. Fallback to default logging:", error);
+    }
+    
     let errorMessage = 'An unexpected error occurred while updating order status.';
     let statusCode = 500;
 
     if (error && typeof error === 'object') {
-      if (error.code === 'P2025') { 
+      if ((error as any).code === 'P2025') { 
         errorMessage = 'Order or related product not found during update.';
         statusCode = 404;
-      } else if (error.message?.includes("Insufficient stock")) {
-        errorMessage = error.message;
-        statusCode = 400; // Bad request due to business logic failure
+      } else if ((error as any).message?.includes("Insufficient stock")) {
+        errorMessage = (error as any).message;
+        statusCode = 400; 
       }
-      else if (error.message) { 
-        errorMessage = error.message;
+      else if ((error as any).message) { 
+        errorMessage = (error as any).message;
       } else {
         try {
           errorMessage = `Non-standard error object: ${JSON.stringify(error)}`;
