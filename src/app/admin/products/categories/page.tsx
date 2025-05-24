@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -33,9 +34,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { PlusCircle, Edit2, Trash2, MoreHorizontal, Loader2 } from 'lucide-react';
+import { PlusCircle, Edit2, Trash2, MoreHorizontal, Loader2, Filter as FilterIcon } from 'lucide-react';
 import type { Category } from '@/types'; 
-import React, { useState, useEffect, type FormEvent } from 'react';
+import React, { useState, useEffect, type FormEvent, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import {
   DropdownMenu,
@@ -58,14 +59,26 @@ export default function AdminCategoriesPage() {
   const [categoryToEdit, setCategoryToEdit] = useState<Category | null>(null);
   const [editedCategoryName, setEditedCategoryName] = useState('');
 
+  // New filter state for categories
+  const [categorySearchTerm, setCategorySearchTerm] = useState('');
 
   const { toast } = useToast();
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    let url = '/api/categories';
+    const queryParams = new URLSearchParams();
+    if (categorySearchTerm.trim()) {
+      queryParams.append('searchQuery', categorySearchTerm.trim());
+    }
+    const queryString = queryParams.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+
     try {
-      const response = await fetch('/api/categories');
+      const response = await fetch(url);
       if (!response.ok) {
         let errorData;
         try {
@@ -92,11 +105,11 @@ export default function AdminCategoriesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [categorySearchTerm, toast]);
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [fetchCategories]);
 
   const handleAddCategory = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -134,7 +147,7 @@ export default function AdminCategoriesPage() {
 
   const openEditDialog = (category: Category) => {
     setCategoryToEdit(category);
-    setEditedCategoryName(category.name); // Initialize with current name
+    setEditedCategoryName(category.name);
     setIsEditDialogOpen(true);
   };
 
@@ -215,6 +228,9 @@ export default function AdminCategoriesPage() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-[50px]">
+                <Checkbox id="selectAllCategories" aria-label="Select all categories" />
+            </TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Slug</TableHead>
             <TableHead>Created At</TableHead>
@@ -224,6 +240,9 @@ export default function AdminCategoriesPage() {
         <TableBody>
           {categories.map((category) => (
             <TableRow key={category.id}>
+              <TableCell>
+                <Checkbox id={`select-category-${category.id}`} aria-label={`Select category ${category.name}`} />
+              </TableCell>
               <TableCell className="font-medium">{category.name}</TableCell>
               <TableCell className="text-muted-foreground">{category.slug}</TableCell>
               <TableCell className="text-muted-foreground">
@@ -296,6 +315,26 @@ export default function AdminCategoriesPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+       {/* New Filter Bar for Categories */}
+      <div className="p-4 bg-card rounded-lg shadow-sm border">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
+          <div className="space-y-1 sm:col-span-2 md:col-span-1">
+            <label htmlFor="category-search" className="text-xs font-medium text-muted-foreground">Search Categories</label>
+            <Input
+              id="category-search"
+              placeholder="Filter by category name..."
+              value={categorySearchTerm}
+              onChange={(e) => setCategorySearchTerm(e.target.value)}
+              className="h-9 text-sm"
+            />
+          </div>
+          <Button onClick={() => setCategorySearchTerm('')} variant="outline" size="sm" className="h-9 text-sm">
+             <FilterIcon className="mr-1.5 h-4 w-4" /> Reset Search
+          </Button>
+        </div>
+      </div>
+
       <Card className="shadow-md">
         <CardHeader>
           <CardTitle>Category List</CardTitle>
@@ -310,7 +349,7 @@ export default function AdminCategoriesPage() {
       {categoryToEdit && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
           setIsEditDialogOpen(isOpen);
-          if (!isOpen) setCategoryToEdit(null); // Clear categoryToEdit when dialog closes
+          if (!isOpen) setCategoryToEdit(null);
         }}>
           <DialogContent className="sm:max-w-[425px]">
             <form onSubmit={handleEditSubmit}>
@@ -348,7 +387,6 @@ export default function AdminCategoriesPage() {
         </Dialog>
       )}
 
-
       {/* Delete Category Confirmation Dialog */}
       {categoryToDelete && (
         <AlertDialog open={!!categoryToDelete} onOpenChange={() => setCategoryToDelete(null)}>
@@ -373,4 +411,3 @@ export default function AdminCategoriesPage() {
     </div>
   );
 }
-

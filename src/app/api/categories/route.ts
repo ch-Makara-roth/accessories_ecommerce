@@ -22,10 +22,24 @@ const categoryCreateSchema = z.object({
   name: z.string().min(1, { message: 'Category name is required.' }).max(100),
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const searchQuery = searchParams.get('searchQuery');
+  const limitParam = searchParams.get('limit');
+
   try {
+    const whereClause: any = {};
+    if (searchQuery) {
+      whereClause.name = {
+        contains: searchQuery,
+        mode: 'insensitive',
+      };
+    }
+
     const categories = await prisma.category.findMany({
+      where: whereClause,
       orderBy: { name: 'asc' },
+      take: limitParam ? parseInt(limitParam, 10) : undefined,
     });
     return NextResponse.json(categories, { status: 200 });
   } catch (error) {

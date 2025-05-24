@@ -19,12 +19,11 @@ export async function GET(request: NextRequest) {
       console.error(`API GET /api/products: CRITICAL - ${errorMsg}`);
       return NextResponse.json({ error: errorMsg, message: errorMsg }, { status: 500 });
   }
-  console.log('API GET /api/products: Prisma client and prisma.product.findMany seem available.');
   
   const { searchParams } = new URL(request.url);
-  const categoryIdParam = searchParams.get('categoryId');
+  const categoryIdParam = searchParams.get('categoryId'); // Now expecting single ID
   const categorySlugParam = searchParams.get('categorySlug');
-  const statusesParam = searchParams.get('status');
+  const statusParam = searchParams.get('status'); // Now expecting single status
   const searchQueryParam = searchParams.get('searchQuery');
   const isOnOfferParam = searchParams.get('isOnOffer');
   const sortByParam = searchParams.get('sortBy');
@@ -40,32 +39,23 @@ export async function GET(request: NextRequest) {
       whereClause.id = { not: excludeProductIdParam };
     }
     
-    let resolvedCategoryIds: string[] | undefined = undefined;
-
     if (categoryIdParam && categoryIdParam !== 'all') {
-      resolvedCategoryIds = categoryIdParam.split(',');
+        whereClause.categoryId = categoryIdParam; // Direct ID
     } else if (categorySlugParam && categorySlugParam !== 'all-categories') {
       const category = await prisma.category.findUnique({
         where: { slug: categorySlugParam },
         select: { id: true }
       });
       if (category) {
-        resolvedCategoryIds = [category.id];
+        whereClause.categoryId = category.id;
       } else {
+        // If specific category slug not found, return no products for that slug filter
         return NextResponse.json({ products: [] }, { status: 200 });
       }
     }
     
-    if (resolvedCategoryIds && resolvedCategoryIds.length > 0) {
-        whereClause.categoryId = { in: resolvedCategoryIds };
-    }
-
-
-    if (statusesParam && statusesParam !== 'all-statuses') {
-      const statuses = statusesParam.split(',');
-      if (statuses.length > 0) {
-        whereClause.status = { in: statuses };
-      }
+    if (statusParam && statusParam !== 'all-statuses') {
+        whereClause.status = statusParam; // Direct status string
     }
 
     if (searchQueryParam) {
@@ -77,8 +67,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (isOnOfferParam === 'true') {
-      whereClause.OR = [
-        ...(whereClause.OR || []), 
+      const offerConditions: Prisma.ProductWhereInput[] = [
         { offer: { not: null, not: '' } },
         { 
           AND: [
@@ -88,21 +77,22 @@ export async function GET(request: NextRequest) {
           ]
         }
       ];
-      if (whereClause.OR.length === 2 && JSON.stringify(whereClause.OR[0]) === "{}") {
-         whereClause.OR.shift();
+       if (whereClause.OR) {
+        whereClause.OR = [...whereClause.OR, ...offerConditions];
+      } else {
+        whereClause.OR = offerConditions;
       }
     }
     
     if (sortByParam) {
-        if (sortByParam === 'createdAt' || sortByParam === 'price' || sortByParam === 'name' || sortByParam === 'rating' || sortByParam === 'stock' ) {
-             orderByClause[sortByParam] = sortOrderParam;
+        if (['createdAt', 'price', 'name', 'rating', 'stock'].includes(sortByParam)) {
+             orderByClause[sortByParam as keyof Prisma.ProductOrderByWithRelationInput] = sortOrderParam;
         } else {
             orderByClause['createdAt'] = 'desc'; 
         }
     } else {
         orderByClause['createdAt'] = 'desc'; 
     }
-
 
     console.log('API GET /api/products: Using whereClause:', JSON.stringify(whereClause));
     console.log('API GET /api/products: Using orderByClause:', JSON.stringify(orderByClause));
@@ -139,7 +129,7 @@ export async function GET(request: NextRequest) {
       offer: productDoc.offer || '',
       tags: Array.isArray(productDoc.tags) ? productDoc.tags : [],
       dataAiHint: productDoc.dataAiHint || `${productDoc.category?.name || 'product'} ${productDoc.name || 'item'}`.substring(0,50).toLowerCase(),
-      stock: typeof productDoc.stock === 'number' ? productDoc.stock : 0,
+      stock: typeof productDoc.stock === 'number' ? productDoc.stock : null, // Keep null if db is null
       status: productDoc.status || 'Draft',
       createdAt: productDoc.createdAt,
       updatedAt: productDoc.updatedAt, 
@@ -179,13 +169,14 @@ export async function POST(request: NextRequest) {
   }
   
   if (!prisma) {
-    console.error('API POST /api/products: CRITICAL - Prisma client (imported as `prisma`) is undefined!');
-    return NextResponse.json({ error: 'Internal Server Error: Prisma client is not initialized. Check server logs, DATABASE_URL in .env.local, and ensure server was restarted.' }, { status: 500 });
+    const msg = 'CRITICAL - Prisma client (imported as `prisma`) is undefined in POST /api/products!';
+    console.error(msg);
+    return NextResponse.json({ error: 'Internal Server Error: Prisma client is not initialized.', details: msg, message: msg }, { status: 500 });
   }
-   if (!prisma.product || typeof prisma.product.create !== 'function') {
-    const errorMsg = 'Internal Server Error: Prisma product model not accessible. Ensure `npx prisma generate` has been run and server restarted.';
-    console.error(`API POST /api/products: CRITICAL - ${errorMsg}. Prisma object keys: ${Object.keys(prisma || {})}. prisma.product type: ${typeof prisma?.product}`);
-    return NextResponse.json({ error: errorMsg, message: errorMsg }, { status: 500 });
+  if (!prisma.product || typeof prisma.product.create !== 'function') {
+    const msg = 'Internal Server Error: Prisma product model or `create` method is not accessible in POST /api/products. Ensure `npx prisma generate` has been run and server restarted.';
+    console.error(`${msg} Prisma object keys: ${Object.keys(prisma || {})}. prisma.product type: ${typeof prisma?.product}`);
+    return NextResponse.json({ error: msg, message: msg }, { status: 500 });
   }
   console.log('API POST /api/products: Prisma client and prisma.product.create seem available.');
 
@@ -226,27 +217,39 @@ export async function POST(request: NextRequest) {
     }
 
     const parsedPrice = parseFloat(String(productFields.price));
-    const parsedOriginalPrice = productFields.originalPrice && String(productFields.originalPrice).trim() !== '' ? parseFloat(String(productFields.originalPrice)) : undefined;
-    const parsedStock = productFields.stock && String(productFields.stock).trim() !== '' ? parseInt(String(productFields.stock), 10) : undefined;
-
-
     if (isNaN(parsedPrice)) {
       return NextResponse.json({ error: 'Price must be a valid number.' }, { status: 400 });
     }
-    if (parsedOriginalPrice !== undefined && isNaN(parsedOriginalPrice)) {
-      return NextResponse.json({ error: 'Original price must be a valid number if provided.' }, { status: 400 });
+    
+    let parsedOriginalPrice: number | undefined | null = undefined;
+    if (productFields.originalPrice !== undefined && productFields.originalPrice !== null && String(productFields.originalPrice).trim() !== '') {
+      parsedOriginalPrice = parseFloat(String(productFields.originalPrice));
+      if (isNaN(parsedOriginalPrice)) {
+        return NextResponse.json({ error: 'Original price must be a valid number if provided.' }, { status: 400 });
+      }
+    } else if (String(productFields.originalPrice).trim() === '') {
+        parsedOriginalPrice = null;
     }
-    if (parsedStock !== undefined && isNaN(parsedStock)) {
-      return NextResponse.json({ error: 'Stock quantity must be a valid number if provided.' }, { status: 400 });
+
+
+    let parsedStock: number | undefined | null = undefined;
+    if (productFields.stock !== undefined && productFields.stock !== null && String(productFields.stock).trim() !== '') {
+        parsedStock = parseInt(String(productFields.stock), 10);
+        if (isNaN(parsedStock)) {
+            return NextResponse.json({ error: 'Stock quantity must be a valid number if provided.' }, { status: 400 });
+        }
+    } else if (String(productFields.stock).trim() === '') {
+        parsedStock = null;
     }
+
 
     const dataToCreate: Prisma.ProductCreateInput = {
       name: String(productFields.name),
       price: parsedPrice,
       description: String(productFields.description),
       image: imageUrl,
-      originalPrice: parsedOriginalPrice === undefined ? null : parsedOriginalPrice,
-      stock: parsedStock === undefined ? null : parsedStock,
+      originalPrice: parsedOriginalPrice,
+      stock: parsedStock,
       status: String(productFields.status || 'Draft'),
       type: productFields.type ? String(productFields.type) : undefined,
       color: productFields.color ? String(productFields.color) : undefined,
@@ -280,15 +283,13 @@ export async function POST(request: NextRequest) {
         console.warn(`API POST /api/products: Provided category ID "${categoryId}" for product "${dataToCreate.name}" is not a valid ObjectId format. Product will be created without category linkage.`);
     }
 
-
     dataToCreate.dataAiHint = `${categoryNameForHint} ${dataToCreate.name || 'item'}`.substring(0, 50).toLowerCase();
-
-    console.log('API POST /api/products: Attempting to create product with data:', JSON.stringify(dataToCreate, null, 2));
     
+    console.log('API POST /api/products: Attempting to create product with data:', JSON.stringify(dataToCreate, null, 2));
     const newProduct = await prisma.product.create({ data: dataToCreate });
     console.log('API POST /api/products: Product created successfully:', newProduct.id);
 
-    return NextResponse.json({ message: "Product added successfully with Prisma", product: newProduct }, { status: 201 });
+    return NextResponse.json({ message: "Product added successfully", product: newProduct }, { status: 201 });
 
   } catch (e: any) {
     console.error('API POST /api/products Error (Prisma):', e);

@@ -2,10 +2,10 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from "@/components/ui/checkbox";
-import { PlusCircle, Search, Edit2, Trash2, MoreHorizontal, Filter as FilterIcon, Loader2, X } from 'lucide-react';
+import { PlusCircle, Edit2, Trash2, MoreHorizontal, Loader2, Filter as FilterIcon } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -14,21 +14,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,13 +25,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useState, useEffect, useCallback } from 'react';
 import type { Product, Category as CategoryType } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { Label } from '@/components/ui/label';
 import { useSession } from 'next-auth/react';
 import { Role } from '@prisma/client';
 
@@ -59,35 +42,33 @@ export default function AdminProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const [selectedCategoryIdsInDialog, setSelectedCategoryIdsInDialog] = useState<string[]>([]);
-  const [selectedStatusesInDialog, setSelectedStatusesInDialog] = useState<string[]>([]);
-  
-  const [appliedCategoryIds, setAppliedCategoryIds] = useState<string[]>([]);
-  const [appliedStatuses, setAppliedStatuses] = useState<string[]>([]);
-
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [availableCategories, setAvailableCategories] = useState<CategoryType[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
-  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
 
-  const [categorySearchTerm, setCategorySearchTerm] = useState('');
-  const [statusSearchTerm, setStatusSearchTerm] = useState('');
+  // New filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('all'); // 'all' or category ID
+  const [filterStatus, setFilterStatus] = useState<string>('all-statuses'); // 'all-statuses' or status string
 
   const availableStatuses = ['Active', 'Draft', 'Archived', 'Scheduled'];
 
-  const fetchProducts = useCallback(async (categoryIdsToFetch?: string[], statusesToFetch?: string[]) => {
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     setError(null);
     let url = '/api/products';
     const queryParams = new URLSearchParams();
 
-    if (categoryIdsToFetch && categoryIdsToFetch.length > 0) {
-      queryParams.append('categoryId', categoryIdsToFetch.join(','));
+    if (searchTerm.trim()) {
+      queryParams.append('searchQuery', searchTerm.trim());
     }
-    if (statusesToFetch && statusesToFetch.length > 0) {
-      queryParams.append('status', statusesToFetch.join(','));
+    if (filterCategory && filterCategory !== 'all') {
+      queryParams.append('categoryId', filterCategory);
+    }
+    if (filterStatus && filterStatus !== 'all-statuses') {
+      queryParams.append('status', filterStatus);
     }
 
     const queryString = queryParams.toString();
@@ -142,7 +123,7 @@ export default function AdminProductsPage() {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, searchTerm, filterCategory, filterStatus]);
 
   const fetchCategoriesForFilter = useCallback(async () => {
     setIsLoadingCategories(true);
@@ -168,54 +149,18 @@ export default function AdminProductsPage() {
   }, [toast]);
 
   useEffect(() => {
-    fetchProducts(appliedCategoryIds, appliedStatuses);
-  }, [fetchProducts, appliedCategoryIds, appliedStatuses]);
+    fetchProducts();
+  }, [fetchProducts]);
 
   useEffect(() => {
     fetchCategoriesForFilter();
   }, [fetchCategoriesForFilter]);
-
-  useEffect(() => {
-    if (isFilterDialogOpen) {
-      setSelectedCategoryIdsInDialog([...appliedCategoryIds]);
-      setSelectedStatusesInDialog([...appliedStatuses]);
-    }
-  }, [isFilterDialogOpen, appliedCategoryIds, appliedStatuses]);
   
-  const handleApplyFilters = () => {
-    setAppliedCategoryIds([...selectedCategoryIdsInDialog]);
-    setAppliedStatuses([...selectedStatusesInDialog]);
-
-    let filterDesc = "Filters applied: ";
-    const activeCategoryNames = selectedCategoryIdsInDialog
-      .map(id => availableCategories.find(cat => cat.id === id)?.name)
-      .filter(Boolean);
-
-    if (activeCategoryNames.length > 0) filterDesc += `Categories (${activeCategoryNames.join(', ')}) `;
-    if (selectedStatusesInDialog.length > 0) filterDesc += `Statuses (${selectedStatusesInDialog.join(', ')})`;
-
-    if (activeCategoryNames.length === 0 && selectedStatusesInDialog.length === 0) {
-      filterDesc = "Showing all products.";
-    }
-    
-    toast({ title: 'Product Filters Updated', description: filterDesc });
-    setIsFilterDialogOpen(false); 
-  };
-  
-  const handleClearDialogFilters = () => {
-    setSelectedCategoryIdsInDialog([]);
-    setSelectedStatusesInDialog([]);
-    setCategorySearchTerm('');
-    setStatusSearchTerm('');
-  };
-
-  const handleResetAllFilters = () => {
-    setAppliedCategoryIds([]);
-    setAppliedStatuses([]);
-    setSelectedCategoryIdsInDialog([]);
-    setSelectedStatusesInDialog([]);
-    setCategorySearchTerm('');
-    setStatusSearchTerm('');
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setFilterCategory('all');
+    setFilterStatus('all-statuses');
+    // fetchProducts will be called by the useEffect due to state changes
     toast({ title: 'Filters Cleared', description: 'Displaying all products.' });
   };
 
@@ -230,7 +175,7 @@ export default function AdminProductsPage() {
       }
       toast({ title: 'Product Deleted', description: `Product "${productToDelete.name}" has been deleted.` });
       setProductToDelete(null);
-      fetchProducts(appliedCategoryIds, appliedStatuses);
+      fetchProducts(); // Re-fetch products
     } catch (error) {
       console.error("Error deleting product:", error);
       const errorToDisplay = error instanceof Error ? error : new Error(String(error));
@@ -239,34 +184,10 @@ export default function AdminProductsPage() {
       setIsDeleting(false);
     }
   };
-
-  const handleCategoryCheckboxChange = (categoryId: string) => {
-    setSelectedCategoryIdsInDialog(prev =>
-      prev.includes(categoryId)
-        ? prev.filter(id => id !== categoryId)
-        : [...prev, categoryId]
-    );
-  };
-
-  const handleStatusCheckboxChange = (statusValue: string) => {
-    setSelectedStatusesInDialog(prev =>
-      prev.includes(statusValue)
-        ? prev.filter(s => s !== statusValue)
-        : [...prev, statusValue]
-    );
-  };
-
-  const filteredDisplayCategories = availableCategories.filter(cat =>
-    cat.name.toLowerCase().includes(categorySearchTerm.toLowerCase())
-  );
-
-  const filteredDisplayStatuses = availableStatuses.filter(status =>
-    status.toLowerCase().includes(statusSearchTerm.toLowerCase())
-  );
   
-  const canAddProduct = userRole === Role.ADMIN || userRole === Role.SELLER || userRole === Role.STOCK;
-  const canDeleteProduct = userRole === Role.ADMIN || userRole === Role.STOCK;
-  const canEditProduct = userRole === Role.ADMIN || userRole === Role.SELLER || userRole === Role.STOCK;
+  const canAddProduct = userRole && [Role.ADMIN, Role.SELLER, Role.STOCK].includes(userRole as Role);
+  const canDeleteProduct = userRole && [Role.ADMIN, Role.STOCK].includes(userRole as Role);
+  const canEditProduct = userRole && [Role.ADMIN, Role.SELLER, Role.STOCK].includes(userRole as Role);
 
   const renderContent = () => {
     if (loading) {
@@ -283,7 +204,7 @@ export default function AdminProductsPage() {
         <div className="text-center py-10 px-4">
           <p className="text-destructive font-semibold mb-2">Error loading products:</p>
           <p className="text-muted-foreground mb-4 text-sm break-words">{error}</p>
-          <Button onClick={() => fetchProducts(appliedCategoryIds, appliedStatuses)} className="mt-4">Try Again</Button>
+          <Button onClick={() => fetchProducts()} className="mt-4">Try Again</Button>
         </div>
       );
     }
@@ -299,7 +220,7 @@ export default function AdminProductsPage() {
         <TableHeader>
           <TableRow>
             <TableHead className="w-[50px]">
-              <Checkbox id="selectAll" />
+              <Checkbox id="selectAllProducts" aria-label="Select all products" />
             </TableHead>
             <TableHead>Product Name</TableHead>
             <TableHead>Category</TableHead>
@@ -313,7 +234,7 @@ export default function AdminProductsPage() {
           {products.map((product) => (
             <TableRow key={product.id}>
               <TableCell>
-                <Checkbox id={`select-${product.id}`} />
+                <Checkbox id={`select-product-${product.id}`} aria-label={`Select product ${product.name}`} />
               </TableCell>
               <TableCell className="font-medium flex items-center gap-3">
                 <Image
@@ -329,13 +250,13 @@ export default function AdminProductsPage() {
               </TableCell>
               <TableCell>{product.category?.name || 'N/A'}</TableCell>
               <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
-              <TableCell className="text-right">{product.stock || 0}</TableCell>
+              <TableCell className="text-right">{product.stock ?? 0}</TableCell>
               <TableCell>
                 <span className={cn("px-2 py-0.5 text-xs rounded-full font-medium",
-                  product.status === 'Active' ? 'bg-green-100 text-green-700'
-                    : product.status === 'Scheduled' ? 'bg-blue-100 text-blue-700'
-                      : product.status === 'Draft' ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-gray-100 text-gray-700'
+                  product.status === 'Active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                    : product.status === 'Scheduled' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                      : product.status === 'Draft' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700/30 dark:text-gray-300'
                 )}>
                   {product.status || 'N/A'}
                 </span>
@@ -372,120 +293,71 @@ export default function AdminProductsPage() {
     );
   };
 
-  const activeFilterCount = appliedCategoryIds.length + appliedStatuses.length;
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl sm:text-3xl font-semibold text-foreground">Products</h1>
+         {canAddProduct && (
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" size="sm" asChild>
+              <Link href="/admin/products/add">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New
+              </Link>
+            </Button>
+        )}
       </div>
+
+      {/* New Filter Bar */}
+      <div className="p-4 bg-card rounded-lg shadow-sm border">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+          <div className="space-y-1">
+            <label htmlFor="product-search" className="text-xs font-medium text-muted-foreground">Search Products</label>
+            <Input
+              id="product-search"
+              placeholder="Filter by name, description..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="filter-category" className="text-xs font-medium text-muted-foreground">Filter by Category</label>
+            <Select value={filterCategory} onValueChange={setFilterCategory} disabled={isLoadingCategories}>
+              <SelectTrigger id="filter-category" className="h-9 text-sm">
+                <SelectValue placeholder={isLoadingCategories ? "Loading..." : "All Categories"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {availableCategories.map(cat => (
+                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+             <label htmlFor="filter-status" className="text-xs font-medium text-muted-foreground">Filter by Status</label>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger id="filter-status" className="h-9 text-sm">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all-statuses">All Statuses</SelectItem>
+                {availableStatuses.map(status => (
+                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={handleResetFilters} variant="outline" size="sm" className="h-9 text-sm">
+             <FilterIcon className="mr-1.5 h-4 w-4" /> Reset Filters
+          </Button>
+        </div>
+      </div>
+
 
       <Card className="shadow-md">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle className="text-xl font-semibold">Products list</CardTitle>
-          <div className="flex items-center gap-2">
-            <Dialog open={isFilterDialogOpen} onOpenChange={(open) => {
-                setIsFilterDialogOpen(open);
-                if (!open) { 
-                   handleApplyFilters();
-                }
-            }}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
-                    <FilterIcon className="mr-2 h-4 w-4" /> Filters
-                    {activeFilterCount > 0 && (
-                       <span className="ml-2 bg-background text-primary rounded-full px-1.5 py-0.5 text-xs font-semibold">
-                         {activeFilterCount}
-                       </span>
-                    )}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg p-0 bg-transparent"> 
-                <DialogHeader className="p-4 border-b">
-                  <div className="flex items-center justify-between">
-                    <DialogTitle className="text-lg font-semibold">Filters</DialogTitle>
-                    <Link href="#" className="text-sm text-primary hover:underline" onClick={(e) => e.preventDefault()}>Save view</Link>
-                  </div>
-                </DialogHeader>
-                <div className="p-4 space-y-4">
-                    <Accordion type="multiple" className="w-full space-y-2" defaultValue={['category-filter', 'status-filter']}>
-                        <AccordionItem value="category-filter" className="border-b-0">
-                            <AccordionTrigger className="text-sm font-medium hover:no-underline py-2 px-1 rounded hover:bg-muted/50">Category</AccordionTrigger>
-                            <AccordionContent className="pt-2 space-y-2">
-                                <div className="relative">
-                                    <Input 
-                                        placeholder="Search categories..." 
-                                        value={categorySearchTerm}
-                                        onChange={(e) => setCategorySearchTerm(e.target.value)}
-                                        className="pl-8 text-xs h-8"
-                                    />
-                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                                </div>
-                                <ScrollArea className="h-[150px] pr-3">
-                                    <div className="space-y-1.5">
-                                    {isLoadingCategories ? <p className="text-xs text-muted-foreground">Loading categories...</p> :
-                                     filteredDisplayCategories.length > 0 ? filteredDisplayCategories.map(cat => (
-                                        <div key={cat.id} className="flex items-center space-x-2">
-                                            <Checkbox 
-                                                id={`cat-${cat.id}`} 
-                                                checked={selectedCategoryIdsInDialog.includes(cat.id)}
-                                                onCheckedChange={() => handleCategoryCheckboxChange(cat.id)}
-                                            />
-                                            <Label htmlFor={`cat-${cat.id}`} className="text-xs font-normal cursor-pointer">{cat.name}</Label>
-                                        </div>
-                                     )) : <p className="text-xs text-muted-foreground">No categories found.</p>}
-                                    </div>
-                                </ScrollArea>
-                                 <Link href="#" className="text-xs text-primary hover:underline mt-1 block" onClick={(e) => e.preventDefault()}>View all...</Link>
-                            </AccordionContent>
-                        </AccordionItem>
-                        
-                        <Separator />
-
-                        <AccordionItem value="status-filter" className="border-b-0">
-                            <AccordionTrigger className="text-sm font-medium hover:no-underline py-2 px-1 rounded hover:bg-muted/50">Status</AccordionTrigger>
-                            <AccordionContent className="pt-2 space-y-2">
-                                 <div className="relative">
-                                    <Input 
-                                        placeholder="Search statuses..." 
-                                        value={statusSearchTerm}
-                                        onChange={(e) => setStatusSearchTerm(e.target.value)}
-                                        className="pl-8 text-xs h-8"
-                                    />
-                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                                </div>
-                                <ScrollArea className="h-[100px] pr-3">
-                                    <div className="space-y-1.5">
-                                    {filteredDisplayStatuses.map(status => (
-                                        <div key={status} className="flex items-center space-x-2">
-                                            <Checkbox 
-                                                id={`status-${status}`}
-                                                checked={selectedStatusesInDialog.includes(status)}
-                                                onCheckedChange={() => handleStatusCheckboxChange(status)}
-                                            />
-                                            <Label htmlFor={`status-${status}`} className="text-xs font-normal cursor-pointer">{status}</Label>
-                                        </div>
-                                    ))}
-                                    </div>
-                                </ScrollArea>
-                                 <Link href="#" className="text-xs text-primary hover:underline mt-1 block" onClick={(e) => e.preventDefault()}>View all...</Link>
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <Button variant="outline" size="sm" onClick={handleResetAllFilters}>Reset Filters</Button>
-            
-            {canAddProduct && (
-                <Button className="bg-primary text-primary-foreground hover:bg-primary/90" size="sm" asChild>
-                  <Link href="/admin/products/add">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add New
-                  </Link>
-                </Button>
-            )}
-          </div>
+          {/* Removed old filter dialog trigger and add button (moved above) */}
         </CardHeader>
         <CardContent>
           {renderContent()}
