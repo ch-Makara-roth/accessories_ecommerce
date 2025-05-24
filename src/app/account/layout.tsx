@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LayoutDashboard, Package, Bell, Settings, Menu, X, LogOut } from 'lucide-react';
+import { LayoutDashboard, Package, Bell, Settings, Menu, X, LogOut, Loader2 } from 'lucide-react'; // Added Loader2
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { usePathname, useRouter } from 'next/navigation'; // Added useRouter
@@ -102,7 +102,7 @@ export default function AccountLayout({
   };
   
   // Show loading state or null if redirecting
-  if (status === 'loading' || (status === 'authenticated' && session?.user?.role !== Role.CUSTOMER)) {
+  if (status === 'loading' || (status === 'authenticated' && session?.user?.role && ![Role.CUSTOMER].includes(session.user.role))) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
