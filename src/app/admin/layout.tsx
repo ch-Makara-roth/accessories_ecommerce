@@ -43,7 +43,7 @@ import { useState, useEffect, type KeyboardEvent } from 'react';
 import type { AdminNotification } from '@/types';
 import { useSession, signOut } from 'next-auth/react';
 import { Loader2 } from 'lucide-react';
-import { Role } from '@prisma/client'; // Correctly import Role enum
+import { Role } from '@prisma/client'; 
 
 interface AdminNavItem {
   href: string;
@@ -52,7 +52,7 @@ interface AdminNavItem {
   subItems?: AdminNavItem[];
   isAccordion?: boolean;
   badgeCount?: number;
-  allowedRoles: Role[]; // Define which roles can see this item
+  allowedRoles: Role[]; 
 }
 
 export default function AdminLayout({
@@ -70,18 +70,18 @@ export default function AdminLayout({
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const userRole = session?.user?.role;
-  const allowedAdminRoles: Role[] = [Role.ADMIN, Role.SELLER, Role.STOCK];
+  const allowedAdminAccessRoles: Role[] = [Role.ADMIN, Role.SELLER, Role.STOCK];
 
   useEffect(() => {
     if (status === 'loading') return; 
-    if (status === 'unauthenticated' || !session || !userRole || !allowedAdminRoles.includes(userRole)) {
+    if (status === 'unauthenticated' || !session || !userRole || !allowedAdminAccessRoles.includes(userRole)) {
       router.push('/auth?error=AccessDeniedAdmin'); 
     }
-  }, [session, status, userRole, router]);
+  }, [session, status, userRole, router, allowedAdminAccessRoles]);
 
 
   useEffect(() => {
-    if (!session || !userRole || !allowedAdminRoles.includes(userRole)) return;
+    if (!session || !userRole || !allowedAdminAccessRoles.includes(userRole)) return;
 
     const fetchUnreadCount = async () => {
       try {
@@ -97,7 +97,7 @@ export default function AdminLayout({
       }
     };
     fetchUnreadCount();
-  }, [session, userRole]);
+  }, [session, userRole, allowedAdminAccessRoles]);
 
   const navItems: AdminNavItem[] = [
     { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK] },
@@ -113,7 +113,7 @@ export default function AdminLayout({
       allowedRoles: [Role.ADMIN, Role.SELLER, Role.STOCK], 
     },
     { href: '/admin/sales', label: 'Sales', icon: DollarSign, allowedRoles: [Role.ADMIN, Role.SELLER] },
-    { href: '/admin/users', label: 'Customers', icon: Users, allowedRoles: [Role.ADMIN] },
+    { href: '/admin/users', label: 'Users', icon: Users, allowedRoles: [Role.ADMIN] }, // Changed label to Users
     { href: '/admin/analytics', label: 'Analytics', icon: LineChart, allowedRoles: [Role.ADMIN] },
     {
       href: '/admin/notifications',
@@ -143,7 +143,6 @@ export default function AdminLayout({
         title: 'Admin Search (Placeholder)',
         description: `Searched for: "${adminSearchTerm}". Implement actual search logic.`,
       });
-      // In a real app: router.push(`/admin/search?q=${adminSearchTerm}`);
     }
   };
   
@@ -238,7 +237,7 @@ export default function AdminLayout({
     );
   }
 
-  if (!session || !userRole || !allowedAdminRoles.includes(userRole)) {
+  if (!session || !userRole || !allowedAdminAccessRoles.includes(userRole)) {
     return (
          <div className="flex justify-center items-center min-h-screen bg-muted/40">
             <p className="text-lg text-destructive">Access Denied. Redirecting...</p>

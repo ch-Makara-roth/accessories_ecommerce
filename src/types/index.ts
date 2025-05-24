@@ -1,9 +1,10 @@
 
+import type { Role } from '@prisma/client'; // Import Role enum from Prisma
 import type { ObjectId } from 'mongodb';
 
 export type Category = {
   id: string;
-  _id?: ObjectId | string; // MongoDB ID, if needed directly
+  _id?: ObjectId | string; 
   name: string;
   slug: string;
   icon?: React.ElementType; 
@@ -71,8 +72,21 @@ export type AdminNotification = {
   id: string;
   title: string;
   description: string;
-  category: string; // e.g., "New Order", "Low Stock", "User Signup"
+  category: string; 
   isRead: boolean;
   createdAt?: Date;
   updatedAt?: Date;
+};
+
+// Define a more complete User type for frontend use, especially for admin user management
+export type User = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  emailVerified?: Date | string | null; // Prisma returns Date, NextAuth might use string initially
+  image?: string | null;
+  role?: Role; // Use the Prisma Role enum
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+  // Exclude password or other sensitive fields that shouldn't be on the client
 };
