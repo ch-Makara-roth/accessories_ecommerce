@@ -11,14 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Package, CheckCircle, Truck, Loader2 } from 'lucide-react'; // Removed unused icons
-import type { OrderType } from '@/types'; // OrderItemType is not directly used here
+import { Package, CheckCircle, Truck, Loader2 } from 'lucide-react';
+import type { OrderType } from '@/types';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from 'next-auth/react';
-import { Role, OrderStatus } from '@prisma/client'; // Added OrderStatus import
+import { Role, OrderStatus } from '@prisma/client'; // Ensure OrderStatus is imported
 import { format } from 'date-fns';
-// Removed Image and Link as they are not directly used in this simplified version
 
 export default function AdminOrderManagementPage() {
   const { data: session } = useSession();
@@ -67,7 +66,7 @@ export default function AdminOrderManagementPage() {
         throw new Error(result.error || `Failed to update order status. Status: ${response.status}`);
       }
       toast({ title: 'Order Status Updated!', description: `Order #${orderId.substring(0,8)}... moved to ${newStatus}.` });
-      fetchOrdersForAdmin(); // Refresh order list
+      fetchOrdersForAdmin(); 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
       toast({ variant: 'destructive', title: 'Error Updating Status', description: errorMessage });
@@ -159,7 +158,6 @@ export default function AdminOrderManagementPage() {
                          <Truck className="mr-1.5 h-3.5 w-3.5" /> Mark Shipped
                       </Button>
                     )}
-                    {/* Add other actions for different statuses if needed */}
                   </>
                 )}
               </TableCell>
